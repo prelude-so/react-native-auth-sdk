@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+    <dict>
+        <key>NSPrivacyTracking</key>
+        <false />
+        <key>NSPrivacyTrackingDomains</key>
+        <array />
+        <key>NSPrivacyCollectedDataTypes</key>
+        <array>
+            <dict>
+                <key>NSPrivacyCollectedDataType</key>
+                <string>NSPrivacyCollectedDataTypeDeviceID</string>
+                <key>NSPrivacyCollectedDataTypeLinked</key>
+                <true />
+                <key>NSPrivacyCollectedDataTypeTracking</key>
+                <false />
+                <key>NSPrivacyCollectedDataTypePurposes</key>
+                <array>
+                    <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                </array>
+            </dict>
+            <dict>
+                <key>NSPrivacyCollectedDataType</key>
+                <string>NSPrivacyCollectedDataTypeOtherDataTypes</string>
+                <key>NSPrivacyCollectedDataTypeLinked</key>
+                <true />
+                <key>NSPrivacyCollectedDataTypeTracking</key>
+                <false />
+                <key>NSPrivacyCollectedDataTypePurposes</key>
+                <array>
+                    <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+                </array>
+            </dict>
+        </array>
+        <!--
+            Required Reason API audit (May 2026):
+
+            This pod ships the bridge module + the vendored
+            `PreludeSession` Swift sources (see scripts/postinstall.js).
+            Audit-grepped for each Required Reason API category:
+
+            - UserDefaults                — not accessed
+            - File Timestamp APIs         — not accessed
+            - System Boot Time APIs       — not accessed (Prelude
+              signals SDK uses sysctl `KERN_BOOTTIME` but ships as
+              a separate pod with its own manifest)
+            - Disk Space APIs             — not accessed
+            - Active Keyboard APIs        — not accessed
+
+            Re-run the audit on every PreludeSession version bump:
+            `git grep -nE 'UserDefaults|systemUptime|KERN_BOOTTIME|creationDate|modificationDate|attributesOfItem|attributesOfFileSystem|systemFreeSize|TIInputMode' \
+                 ios/sdk/PreludeSession ios/*.swift`
+            and add matching entries to NSPrivacyAccessedAPITypes
+            below. Empty array is the explicit audit result.
+        -->
+        <key>NSPrivacyAccessedAPITypes</key>
+        <array />
+    </dict>
+</plist>

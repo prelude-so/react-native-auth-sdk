@@ -1,0 +1,74 @@
+{
+  "name": "@prelude.so/react-native-session-sdk",
+  "version": "0.1.0",
+  "description": "Prelude Session SDK for React Native — OTP login, password login, refresh, step-up, and signed sessions on iOS and Android.",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "sideEffects": false,
+  "scripts": {
+    "build": "expo-module build",
+    "clean": "expo-module clean",
+    "lint": "expo-module lint",
+    "test": "expo-module test --selectProjects Node Web",
+    "prepublishOnly": "expo-module prepublishOnly",
+    "expo-module": "expo-module",
+    "postinstall": "node scripts/postinstall.js",
+    "smoke": "bash scripts/check-install.sh"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "prelude",
+    "session",
+    "auth",
+    "PreludeReactNativeSessionSdk"
+  ],
+  "files": [
+    "CHANGELOG.md",
+    "LICENSE",
+    "android/build.gradle",
+    "android/src/main/",
+    "build/",
+    "expo-module.config.json",
+    "ios/*.swift",
+    "ios/*.podspec",
+    "ios/PrivacyInfo.xcprivacy",
+    "scripts/postinstall.js",
+    "src/*.ts",
+    "src/types/"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/prelude-so/react-native-session-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/prelude-so/react-native-session-sdk/issues"
+  },
+  "author": "Prelude <hello@prelude.so> (https://github.com/prelude-so)",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/prelude-so/react-native-session-sdk#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "expo": "~52.0.46",
+    "expo-module-scripts": "^4.0.2",
+    "react": "^18.3.0",
+    "react-native": "0.76.9"
+  },
+  "peerDependencies": {
+    "expo": ">=52.0.0",
+    "react": ">=18.2.0",
+    "react-native": ">=0.74.0"
+  },
+  "so_prelude": {
+    "apple_session_sdk_tag": "0.2.0",
+    "android_session_sdk_version": "0.2.0",
+    "android_signals_sdk_version": "0.5.0"
+  },
+  "jest": {
+    "preset": "expo-module-scripts"
+  }
+}

@@ -1,0 +1,143 @@
+/**
+ * Base type for every error thrown by `PreludeSessionClient`.
+ *
+ * Native `CodedError`s are decoded into matching subclasses by
+ * `fromNativeError`; consumers `instanceof`-match the case they
+ * care about.
+ */
+export class PreludeSessionError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "PreludeSessionError";
+  }
+}
+
+const subclass = (code: string, name: string) =>
+  class extends PreludeSessionError {
+    constructor(message: string) {
+      super(code, message);
+      this.name = name;
+    }
+  };
+
+export const BadRequestError = subclass("bad_request", "BadRequestError");
+export const UnauthorizedError = subclass("unauthorized", "UnauthorizedError");
+export const ForbiddenError = subclass("forbidden", "ForbiddenError");
+export const NotFoundError = subclass("not_found", "NotFoundError");
+export const ConflictError = subclass("conflict", "ConflictError");
+export const RateLimitedError = subclass("rate_limited", "RateLimitedError");
+export const InternalServerError = subclass(
+  "internal_server_error",
+  "InternalServerError",
+);
+export const MissingChallengeTokenError = subclass(
+  "missing_challenge_token",
+  "MissingChallengeTokenError",
+);
+export const InvalidChallengeTokenError = subclass(
+  "invalid_challenge_token",
+  "InvalidChallengeTokenError",
+);
+/** Step-up challenge token exceeded its TTL. Recover via `requestStepUp`. */
+export const ExpiredChallengeTokenError = subclass(
+  "expired_challenge_token",
+  "ExpiredChallengeTokenError",
+);
+/** Bearer token was already redeemed. Same recovery: start a fresh challenge. */
+export const TokenReusedError = subclass("token_reused", "TokenReusedError");
+export const InvalidOTPCodeError = subclass(
+  "invalid_otp_code",
+  "InvalidOTPCodeError",
+);
+export const RefreshFailedError = subclass(
+  "refresh_failed",
+  "RefreshFailedError",
+);
+export const TimeoutError = subclass("timeout", "TimeoutError");
+export const InvalidConfigurationError = subclass(
+  "invalid_configuration",
+  "InvalidConfigurationError",
+);
+export const InvalidPasswordError = subclass(
+  "invalid_password",
+  "InvalidPasswordError",
+);
+export const InsufficientScopeError = subclass(
+  "insufficient_scope",
+  "InsufficientScopeError",
+);
+/**
+ * Local crypto / Keychain / Keystore failure on the device. Recovery
+ * is platform-specific (e.g. clearing app data); not retryable.
+ * Currently surfaced by the Android native SDK only.
+ */
+export const CryptoFailureError = subclass(
+  "crypto_failure",
+  "CryptoFailureError",
+);
+/**
+ * The Prelude signals SDK failed to dispatch. Login is aborted because
+ * the server expects a `dispatch_id`. Currently surfaced by the
+ * Android native SDK only.
+ */
+export const SignalsDispatchFailedError = subclass(
+  "signals_dispatch_failed",
+  "SignalsDispatchFailedError",
+);
+export const NetworkError = subclass("network", "NetworkError");
+
+/**
+ * Thrown when a method is called on a disposed `PreludeSessionClient`.
+ * Programmer error — distinct from API errors. Subclasses
+ * `PreludeSessionError` so a single `catch` covers both.
+ */
+export class DisposedError extends PreludeSessionError {
+  constructor() {
+    super(
+      "disposed",
+      "PreludeSessionClient has been disposed. Create a new instance " +
+        "to start a new logical session.",
+    );
+    this.name = "DisposedError";
+  }
+}
+
+const REGISTRY: Record<string, new (m: string) => PreludeSessionError> = {
+  bad_request: BadRequestError,
+  unauthorized: UnauthorizedError,
+  forbidden: ForbiddenError,
+  not_found: NotFoundError,
+  conflict: ConflictError,
+  rate_limited: RateLimitedError,
+  internal_server_error: InternalServerError,
+  missing_challenge_token: MissingChallengeTokenError,
+  invalid_challenge_token: InvalidChallengeTokenError,
+  expired_challenge_token: ExpiredChallengeTokenError,
+  token_reused: TokenReusedError,
+  invalid_otp_code: InvalidOTPCodeError,
+  refresh_failed: RefreshFailedError,
+  timeout: TimeoutError,
+  invalid_configuration: InvalidConfigurationError,
+  invalid_password: InvalidPasswordError,
+  insufficient_scope: InsufficientScopeError,
+  crypto_failure: CryptoFailureError,
+  signals_dispatch_failed: SignalsDispatchFailedError,
+  network: NetworkError,
+};
+
+/**
+ * Decode an Expo `CodedError` into the matching `PreludeSessionError`
+ * subclass. Unknown codes fall through to a generic `PreludeSessionError`
+ * — keeps forward compat with new server-side codes cheap.
+ */
+export function fromNativeError(e: unknown): PreludeSessionError {
+  if (e instanceof PreludeSessionError) return e;
+  const err = e as { code?: string; message?: string };
+  const code = err?.code ?? "unknown";
+  const message = err?.message ?? String(e);
+  const Cls = REGISTRY[code];
+  return Cls ? new Cls(message) : new PreludeSessionError(code, message);
+}

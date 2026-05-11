@@ -1,0 +1,72 @@
+import groovy.json.JsonSlurper
+
+apply plugin: 'com.android.library'
+
+// Versions are sourced from package.json so the npm release, the
+// podspec, and the Gradle dependency move in lockstep — bumping any
+// SDK version is a one-line change in package.json.
+def packageJson = new JsonSlurper().parse(file('../package.json'))
+def sessionSdkVersion = packageJson.so_prelude.android_session_sdk_version
+def signalsSdkVersion = packageJson.so_prelude.android_signals_sdk_version
+if (!sessionSdkVersion || !signalsSdkVersion) {
+  throw new GradleException(
+    "package.json is missing so_prelude.android_session_sdk_version " +
+    "or so_prelude.android_signals_sdk_version"
+  )
+}
+
+group = 'so.prelude.reactnative.session.sdk'
+version = packageJson.version
+
+def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
+apply from: expoModulesCorePlugin
+applyKotlinExpoModulesCorePlugin()
+useCoreDependencies()
+useExpoPublishing()
+
+def useManagedAndroidSdkVersions = false
+if (useManagedAndroidSdkVersions) {
+  useDefaultAndroidSdkVersions()
+} else {
+  buildscript {
+    ext.safeExtGet = { prop, fallback ->
+      rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+    }
+  }
+  project.android {
+    compileSdkVersion safeExtGet("compileSdkVersion", 34)
+    defaultConfig {
+      minSdkVersion safeExtGet("minSdkVersion", 26)
+      targetSdkVersion safeExtGet("targetSdkVersion", 34)
+    }
+  }
+}
+
+android {
+  namespace "so.prelude.reactnative.session.sdk"
+  defaultConfig {
+    versionCode 1
+    versionName version
+  }
+  lintOptions {
+    abortOnError false
+  }
+  // `unitTests.isReturnDefaultValues = true` lets pure-JVM tests
+  // touch `android.*` indirectly without pulling in Robolectric;
+  // we only ever stub `Context`, so default-returning is enough.
+  testOptions {
+    unitTests.returnDefaultValues = true
+  }
+}
+
+dependencies {
+  implementation("so.prelude.android:session-sdk:${sessionSdkVersion}")
+  // Signals SDK — wrapped by [PreludeSignalsAdapter]; pin moves with
+  // package.json's `android_signals_sdk_version`.
+  implementation("so.prelude.android:sdk:${signalsSdkVersion}")
+
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.mockito:mockito-core:5.11.0'
+  testImplementation 'org.jetbrains.kotlin:kotlin-test:2.0.21'
+  testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1'
+}
