@@ -1,15 +1,15 @@
-// Post-install: vendor the PreludeSession Swift sources into
-// `ios/sdk/PreludeSession/` so the podspec can compile them
-// into the bridge. Tag is pinned by `so_prelude.apple_session_sdk_tag`
+// Post-install: vendor the PreludeAuth Swift sources into
+// `ios/sdk/PreludeAuth/` so the podspec can compile them
+// into the bridge. Tag is pinned by `so_prelude.apple_auth_sdk_tag`
 // in `package.json`.
 //
-// Mirrors the Flutter session SDK's vendoring step. Unlike the
-// signals SDK, PreludeSession ships as plain Swift sources (no
+// Mirrors the Flutter auth SDK's vendoring step. Unlike the
+// signals SDK, PreludeAuth ships as plain Swift sources (no
 // XCFramework), so a single zip download is enough.
 //
-// Override the source location with `APPLE_SESSION_SDK_LOCATION`
-// (HTTPS URL or local path) when iterating on PreludeSession and
-// the bridge in lockstep without cutting an apple-session-sdk
+// Override the source location with `APPLE_AUTH_SDK_LOCATION`
+// (HTTPS URL or local path) when iterating on PreludeAuth and
+// the bridge in lockstep without cutting an apple-auth-sdk
 // release between every change.
 
 const fs = require("fs");
@@ -28,18 +28,18 @@ async function main() {
   fs.mkdirSync(sdkPath);
 
   const packageFile = require(packagePath);
-  const tag = packageFile.so_prelude.apple_session_sdk_tag;
-  // apple-session-sdk releases are tagged `vX.Y.Z` — keep parity
-  // with the Flutter session SDK's podspec.
+  const tag = packageFile.so_prelude.apple_auth_sdk_tag;
+  // apple-auth-sdk releases are tagged `vX.Y.Z` — keep parity
+  // with the Flutter auth SDK's podspec.
   const sources =
-    process.env.APPLE_SESSION_SDK_LOCATION ||
-    `https://github.com/prelude-so/apple-session-sdk/archive/refs/tags/v${tag}.zip`;
+    process.env.APPLE_AUTH_SDK_LOCATION ||
+    `https://github.com/prelude-so/apple-auth-sdk/archive/refs/tags/v${tag}.zip`;
 
-  // Soft-fail when the apple-session-sdk release isn't reachable yet
+  // Soft-fail when the apple-auth-sdk release isn't reachable yet
   // (e.g. during early scaffolding before the first tag is cut). A
   // hard throw would abort `npm install` for every consumer of this
   // package, including the bundled demo app — which only needs the
-  // bridge stubs to build, not PreludeSession itself. The cocoapods
+  // bridge stubs to build, not PreludeAuth itself. The cocoapods
   // build will fail later if real sources are required, with a
   // far clearer error.
   try {
@@ -50,38 +50,38 @@ async function main() {
     }
   } catch (e) {
     logWarning(
-      `Skipping Apple Session SDK vendoring: ${e.message}\n` +
-        `iOS builds will fail to link PreludeSession symbols until ` +
+      `Skipping Apple Auth SDK vendoring: ${e.message}\n` +
+        `iOS builds will fail to link PreludeAuth symbols until ` +
         `this succeeds. Re-run npm install on a network that can ` +
-        `reach github.com, or set APPLE_SESSION_SDK_LOCATION to a ` +
+        `reach github.com, or set APPLE_AUTH_SDK_LOCATION to a ` +
         `local checkout.`,
     );
     writePlaceholder(sdkPath);
     return;
   }
 
-  logSuccess("The Prelude Apple Session SDK has been configured.");
+  logSuccess("The Prelude Apple Auth SDK has been configured.");
 }
 
 /**
  * Drop a marker so the next install knows the directory is empty
  * by design (not by a half-completed extract). The podspec globs
- * `**\/*.swift` so an empty PreludeSession dir is harmless.
+ * `**\/*.swift` so an empty PreludeAuth dir is harmless.
  */
 function writePlaceholder(dest) {
-  const dir = path.join(dest, "PreludeSession");
+  const dir = path.join(dest, "PreludeAuth");
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
     path.join(dir, "PLACEHOLDER.md"),
-    "PreludeSession sources are not vendored. The bridge stubs " +
+    "PreludeAuth sources are not vendored. The bridge stubs " +
       "compile without them; wire up the real sources by setting " +
-      "`APPLE_SESSION_SDK_LOCATION` or cutting an apple-session-sdk " +
+      "`APPLE_AUTH_SDK_LOCATION` or cutting an apple-auth-sdk " +
       "release matching the tag in package.json.\n",
   );
 }
 
 async function fromUrl(url, dest, tag) {
-  logMessage(`Downloading the Prelude Apple Session SDK ${tag}.`);
+  logMessage(`Downloading the Prelude Apple Auth SDK ${tag}.`);
   const zipPath = `${dest}/${tag}.zip`;
   // try/finally so a failure mid-extract still cleans up the staging
   // tmp/ dir. Otherwise the leftover tree (including Tests/*.swift)
@@ -92,13 +92,13 @@ async function fromUrl(url, dest, tag) {
     await unzip(zipPath, `${dest}/tmp`);
     fs.rmSync(zipPath, { force: true });
     const unzippedDir = fs.readdirSync(`${dest}/tmp`)[0];
-    const preludeSessionSrc = `${dest}/tmp/${unzippedDir}/Sources/PreludeSession`;
-    if (!fs.existsSync(preludeSessionSrc)) {
+    const preludeAuthSrc = `${dest}/tmp/${unzippedDir}/Sources/PreludeAuth`;
+    if (!fs.existsSync(preludeAuthSrc)) {
       throw new Error(
-        `Extracted archive does not contain Sources/PreludeSession/ at ${preludeSessionSrc}.`,
+        `Extracted archive does not contain Sources/PreludeAuth/ at ${preludeAuthSrc}.`,
       );
     }
-    fs.renameSync(preludeSessionSrc, `${dest}/PreludeSession`);
+    fs.renameSync(preludeAuthSrc, `${dest}/PreludeAuth`);
   } finally {
     fs.rmSync(`${dest}/tmp`, { recursive: true, force: true });
     fs.rmSync(zipPath, { force: true });
@@ -106,21 +106,21 @@ async function fromUrl(url, dest, tag) {
 }
 
 function fromLocal(localPath, dest) {
-  const preludeSessionSrc = path.join(localPath, "Sources", "PreludeSession");
-  if (!fs.existsSync(preludeSessionSrc)) {
+  const preludeAuthSrc = path.join(localPath, "Sources", "PreludeAuth");
+  if (!fs.existsSync(preludeAuthSrc)) {
     throw new Error(
-      `APPLE_SESSION_SDK_LOCATION=${localPath} does not look like a ` +
-        `PreludeSession Swift package (missing Sources/PreludeSession/).`,
+      `APPLE_AUTH_SDK_LOCATION=${localPath} does not look like a ` +
+        `PreludeAuth Swift package (missing Sources/PreludeAuth/).`,
     );
   }
-  fs.cpSync(preludeSessionSrc, `${dest}/PreludeSession`, { recursive: true });
+  fs.cpSync(preludeAuthSrc, `${dest}/PreludeAuth`, { recursive: true });
 }
 
 const downloadFile = async (url, fileName) => {
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(
-      `Failed to download Apple Session SDK from ${url}: ${res.statusText}`,
+      `Failed to download Apple Auth SDK from ${url}: ${res.statusText}`,
     );
   }
   fs.rmSync(fileName, { force: true });

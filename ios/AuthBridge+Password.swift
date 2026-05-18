@@ -2,7 +2,7 @@
 
 import Foundation
 
-extension SessionBridge {
+extension AuthBridge {
     func loginWithPassword(
         handle: String, configRaw: [String: Any], options: [String: Any]
     ) async throws -> [String: Any] {

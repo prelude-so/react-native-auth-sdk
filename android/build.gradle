@@ -6,16 +6,16 @@ apply plugin: 'com.android.library'
 // podspec, and the Gradle dependency move in lockstep — bumping any
 // SDK version is a one-line change in package.json.
 def packageJson = new JsonSlurper().parse(file('../package.json'))
-def sessionSdkVersion = packageJson.so_prelude.android_session_sdk_version
+def authSdkVersion = packageJson.so_prelude.android_auth_sdk_version
 def signalsSdkVersion = packageJson.so_prelude.android_signals_sdk_version
-if (!sessionSdkVersion || !signalsSdkVersion) {
+if (!authSdkVersion || !signalsSdkVersion) {
   throw new GradleException(
-    "package.json is missing so_prelude.android_session_sdk_version " +
+    "package.json is missing so_prelude.android_auth_sdk_version " +
     "or so_prelude.android_signals_sdk_version"
   )
 }
 
-group = 'so.prelude.reactnative.session.sdk'
+group = 'so.prelude.reactnative.auth.sdk'
 version = packageJson.version
 
 def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
@@ -43,7 +43,7 @@ if (useManagedAndroidSdkVersions) {
 }
 
 android {
-  namespace "so.prelude.reactnative.session.sdk"
+  namespace "so.prelude.reactnative.auth.sdk"
   defaultConfig {
     versionCode 1
     versionName version
@@ -60,7 +60,7 @@ android {
 }
 
 dependencies {
-  implementation("so.prelude.android:session-sdk:${sessionSdkVersion}")
+  implementation("so.prelude.android:auth-sdk:${authSdkVersion}")
   // Signals SDK — wrapped by [PreludeSignalsAdapter]; pin moves with
   // package.json's `android_signals_sdk_version`.
   implementation("so.prelude.android:sdk:${signalsSdkVersion}")

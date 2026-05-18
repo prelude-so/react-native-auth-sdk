@@ -1,22 +1,22 @@
 /**
- * Base type for every error thrown by `PreludeSessionClient`.
+ * Base type for every error thrown by `PreludeAuthClient`.
  *
  * Native `CodedError`s are decoded into matching subclasses by
  * `fromNativeError`; consumers `instanceof`-match the case they
  * care about.
  */
-export class PreludeSessionError extends Error {
+export class PreludeAuthError extends Error {
   constructor(
     readonly code: string,
     message: string,
   ) {
     super(message);
-    this.name = "PreludeSessionError";
+    this.name = "PreludeAuthError";
   }
 }
 
 const subclass = (code: string, name: string) =>
-  class extends PreludeSessionError {
+  class extends PreludeAuthError {
     constructor(message: string) {
       super(code, message);
       this.name = name;
@@ -90,22 +90,22 @@ export const SignalsDispatchFailedError = subclass(
 export const NetworkError = subclass("network", "NetworkError");
 
 /**
- * Thrown when a method is called on a disposed `PreludeSessionClient`.
+ * Thrown when a method is called on a disposed `PreludeAuthClient`.
  * Programmer error — distinct from API errors. Subclasses
- * `PreludeSessionError` so a single `catch` covers both.
+ * `PreludeAuthError` so a single `catch` covers both.
  */
-export class DisposedError extends PreludeSessionError {
+export class DisposedError extends PreludeAuthError {
   constructor() {
     super(
       "disposed",
-      "PreludeSessionClient has been disposed. Create a new instance " +
+      "PreludeAuthClient has been disposed. Create a new instance " +
         "to start a new logical session.",
     );
     this.name = "DisposedError";
   }
 }
 
-const REGISTRY: Record<string, new (m: string) => PreludeSessionError> = {
+const REGISTRY: Record<string, new (m: string) => PreludeAuthError> = {
   bad_request: BadRequestError,
   unauthorized: UnauthorizedError,
   forbidden: ForbiddenError,
@@ -129,15 +129,15 @@ const REGISTRY: Record<string, new (m: string) => PreludeSessionError> = {
 };
 
 /**
- * Decode an Expo `CodedError` into the matching `PreludeSessionError`
- * subclass. Unknown codes fall through to a generic `PreludeSessionError`
+ * Decode an Expo `CodedError` into the matching `PreludeAuthError`
+ * subclass. Unknown codes fall through to a generic `PreludeAuthError`
  * — keeps forward compat with new server-side codes cheap.
  */
-export function fromNativeError(e: unknown): PreludeSessionError {
-  if (e instanceof PreludeSessionError) return e;
+export function fromNativeError(e: unknown): PreludeAuthError {
+  if (e instanceof PreludeAuthError) return e;
   const err = e as { code?: string; message?: string };
   const code = err?.code ?? "unknown";
   const message = err?.message ?? String(e);
   const Cls = REGISTRY[code];
-  return Cls ? new Cls(message) : new PreludeSessionError(code, message);
+  return Cls ? new Cls(message) : new PreludeAuthError(code, message);
 }

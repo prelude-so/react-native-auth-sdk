@@ -24,7 +24,7 @@ import {
 import { stepUpChallengeFromJson, StepUpChallenge } from "./types/stepUp";
 import { PreludeUser, userFromJson } from "./types/user";
 
-export interface PreludeSessionClientOptions {
+export interface PreludeAuthClientOptions {
   /** API endpoint. Defaults to `Endpoint.default`. */
   endpoint?: Endpoint;
   /** Canonical-authority hint. `undefined` derives from the endpoint. */
@@ -65,7 +65,7 @@ export interface RequestStepUpOptions {
 }
 
 /**
- * Bridges to the native iOS / Android session clients.
+ * Bridges to the native iOS / Android auth clients.
  *
  * One JS instance owns one logical session: the SDK stamps an
  * opaque handle at construction and forwards it with every call.
@@ -76,12 +76,12 @@ export interface RequestStepUpOptions {
  * Call `dispose()` when done. Forgetting leaks the native client
  * until the process exits; nothing else breaks.
  */
-export class PreludeSessionClient {
+export class PreludeAuthClient {
   private readonly handle = newHandle();
   private readonly config: ConfigJson;
   private disposed = false;
 
-  constructor(options: PreludeSessionClientOptions = {}) {
+  constructor(options: PreludeAuthClientOptions = {}) {
     // Empty-string overrides collapse to `null` so a misconfigured
     // env var doesn't construct a half-wired dispatcher native-side.
     // Native side re-checks for blank as defence in depth.
@@ -166,13 +166,13 @@ export class PreludeSessionClient {
   /**
    * Convenience that fetches compliancy then runs `validate`.
    * For real-time validation, fetch compliancy once and call the
-   * static `PreludeSessionClient.validate` synchronously.
+   * static `PreludeAuthClient.validate` synchronously.
    */
   async validatePassword(
     password: string,
   ): Promise<PreludePasswordCompliancyResults> {
     const compliancy = await this.passwordCompliancy();
-    return PreludeSessionClient.validate(password, compliancy);
+    return PreludeAuthClient.validate(password, compliancy);
   }
 
   /** Pure password classifier — re-export of `validatePassword`. */

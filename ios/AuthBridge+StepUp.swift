@@ -1,11 +1,11 @@
 // Step-up: request, deliver OTP, submit OTP, and read the most
 // recent in-flight challenge. Only the public-surface metadata
 // crosses the bridge; the challenge JWT lives in
-// ``SessionBridge``'s per-handle cache.
+// ``AuthBridge``'s per-handle cache.
 
 import Foundation
 
-extension SessionBridge {
+extension AuthBridge {
     func requestStepUp(
         handle: String,
         configRaw: [String: Any],
@@ -37,7 +37,7 @@ extension SessionBridge {
     }
 
     /// Trigger OTP delivery for an in-flight challenge. The native
-    /// client throws ``PreludeSessionError/invalidChallengeToken``
+    /// client throws ``PreludeAuthError/invalidChallengeToken``
     /// for blocked challenges; we don't evict the cache entry on
     /// that path because the lookup itself already misses then.
     func sendStepUpOTP(
@@ -85,7 +85,7 @@ extension SessionBridge {
             // minting a fresh one; preserves any future cancellation
             // context the runtime attaches.
             throw cancel
-        } catch let error as PreludeSessionError {
+        } catch let error as PreludeAuthError {
             // `invalidOTPCode` keeps the challenge usable up to the
             // server's bucket limit; any other typed SDK error kills it.
             if case .invalidOTPCode = error {

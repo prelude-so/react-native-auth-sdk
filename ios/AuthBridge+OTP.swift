@@ -2,7 +2,7 @@
 
 import Foundation
 
-extension SessionBridge {
+extension AuthBridge {
     func startOTPLogin(
         handle: String, configRaw: [String: Any], options: [String: Any]
     ) async throws {

@@ -1,9 +1,9 @@
 {
   "platforms": ["apple", "android"],
   "apple": {
-    "modules": ["PreludeReactNativeSessionSdkModule"]
+    "modules": ["PreludeReactNativeAuthSdkModule"]
   },
   "android": {
-    "modules": ["so.prelude.reactnative.session.sdk.PreludeReactNativeSessionSdkModule"]
+    "modules": ["so.prelude.reactnative.auth.sdk.PreludeReactNativeAuthSdkModule"]
   }
 }

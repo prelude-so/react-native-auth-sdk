@@ -1,8 +1,8 @@
-// PreludeReactNativeSessionSdkModule
+// PreludeReactNativeAuthSdkModule
 //
-// Android Expo module for the React Native Session SDK. Bridges the
-// JS `PreludeSessionClient` API onto `so.prelude.android:session-sdk`'s
-// `PreludeSessionClient` class.
+// Android Expo module for the React Native Auth SDK. Bridges the
+// JS `PreludeAuthClient` API onto `so.prelude.android:auth-sdk`'s
+// `PreludeAuthClient` class.
 //
 // One JS instance maps to one native client, looked up by the
 // per-instance `handle` string the JS side stamps at construction.
@@ -14,7 +14,7 @@
 // (handle, challengeID), so the wire form sent across the bridge can
 // omit the bearer challenge token.
 
-package so.prelude.reactnative.session.sdk
+package so.prelude.reactnative.auth.sdk
 
 import android.content.Context
 import expo.modules.kotlin.exception.CodedException
@@ -24,29 +24,29 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import so.prelude.android.session.PreludeSessionClient
-import so.prelude.android.session.PreludeSessionError
-import so.prelude.android.session.PreludeStepUpStatus
-import so.prelude.android.session.RedactedString
-import so.prelude.android.session.changePassword
-import so.prelude.android.session.checkOTP
-import so.prelude.android.session.getPasswordCompliancy
-import so.prelude.android.session.listSessions
-import so.prelude.android.session.loginWithPassword
-import so.prelude.android.session.logout
-import so.prelude.android.session.requestStepUp
-import so.prelude.android.session.resendOTP
-import so.prelude.android.session.revokeSessions
-import so.prelude.android.session.sendStepUpOTP
-import so.prelude.android.session.startOTPLogin
-import so.prelude.android.session.submitStepUpOTP
+import so.prelude.android.auth.PreludeAuthClient
+import so.prelude.android.auth.PreludeAuthError
+import so.prelude.android.auth.PreludeStepUpStatus
+import so.prelude.android.auth.RedactedString
+import so.prelude.android.auth.changePassword
+import so.prelude.android.auth.checkOTP
+import so.prelude.android.auth.getPasswordCompliancy
+import so.prelude.android.auth.listSessions
+import so.prelude.android.auth.loginWithPassword
+import so.prelude.android.auth.logout
+import so.prelude.android.auth.requestStepUp
+import so.prelude.android.auth.resendOTP
+import so.prelude.android.auth.revokeSessions
+import so.prelude.android.auth.sendStepUpOTP
+import so.prelude.android.auth.startOTPLogin
+import so.prelude.android.auth.submitStepUpOTP
 
-class PreludeReactNativeSessionSdkModule : Module() {
+class PreludeReactNativeAuthSdkModule : Module() {
     private val clientRegistry = ClientRegistry()
 
     override fun definition() =
         ModuleDefinition {
-            Name("PreludeReactNativeSessionSdk")
+            Name("PreludeReactNativeAuthSdk")
 
             // Drop the native client and step-up cache for this handle
             // when the JS instance is disposed. Synchronous: nothing
@@ -194,7 +194,7 @@ class PreludeReactNativeSessionSdkModule : Module() {
     private suspend fun <R> withClient(
         handle: String,
         configRaw: Map<*, *>,
-        block: suspend (PreludeSessionClient) -> R,
+        block: suspend (PreludeAuthClient) -> R,
     ): R = withContext(Dispatchers.IO) {
         val context: Context = appContext.reactContext
             ?: throw CodedException("generic", "module detached", null)
@@ -223,7 +223,7 @@ class PreludeReactNativeSessionSdkModule : Module() {
      */
     private suspend fun handleSubmitStepUpOTP(
         handle: String,
-        client: PreludeSessionClient,
+        client: PreludeAuthClient,
         challengeId: String,
         code: String,
     ): Map<String, Any?>? {
@@ -260,10 +260,10 @@ class PreludeReactNativeSessionSdkModule : Module() {
             // the next attempt can resume against the same handle.
             throw e
         } catch (e: Throwable) {
-            // Catch broadly: a non-[PreludeSessionError] throw (e.g. a
+            // Catch broadly: a non-[PreludeAuthError] throw (e.g. a
             // misconfigured store NPE) must still evict the challenge
             // so a stale entry can't outlive the failure.
-            if (e !is PreludeSessionError.InvalidOTPCode) {
+            if (e !is PreludeAuthError.InvalidOTPCode) {
                 clientRegistry.evictChallenge(handle, challenge.challengeId)
             }
             throw e

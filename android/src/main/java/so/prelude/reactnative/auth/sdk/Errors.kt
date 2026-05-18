@@ -1,11 +1,11 @@
-package so.prelude.reactnative.session.sdk
+package so.prelude.reactnative.auth.sdk
 
 import expo.modules.kotlin.exception.CodedException
-import so.prelude.android.session.PreludeSessionError
+import so.prelude.android.auth.PreludeAuthError
 
 /**
  * Local exception type for argument / config decode failures. Kept
- * distinct from [PreludeSessionError] so the error mapper can route
+ * distinct from [PreludeAuthError] so the error mapper can route
  * decode failures to a stable `bad_request` code without reaching
  * for the SDK's error hierarchy.
  */
@@ -21,7 +21,7 @@ internal fun decodeError(message: String): Throwable = DecodeException(message)
 internal fun mapError(error: Throwable): CodedException =
     when (error) {
         is CodedException -> error
-        is PreludeSessionError -> mapSessionError(error)
+        is PreludeAuthError -> mapAuthError(error)
         is DecodeException -> CodedException("bad_request", error.message ?: "bad_request", error)
         else -> CodedException("generic", error.toString(), error)
     }
@@ -34,8 +34,8 @@ internal fun mapError(error: Throwable): CodedException =
  * indistinguishable from any other failure during ops triage.
  * `default` ("Network error", "Crypto failure", …) is the floor.
  */
-private fun causeMessage(error: PreludeSessionError, default: String): String {
-    // Prefer the cause's own message; the [PreludeSessionError]
+private fun causeMessage(error: PreludeAuthError, default: String): String {
+    // Prefer the cause's own message; the [PreludeAuthError]
     // wrapper's `message` always carries a `"Network: …"`-shaped
     // prefix that's noise for the JS-side `error.message`. Fall
     // back to the cause's class name (so triage can still see
@@ -46,52 +46,52 @@ private fun causeMessage(error: PreludeSessionError, default: String): String {
     return default
 }
 
-private fun mapSessionError(error: PreludeSessionError): CodedException =
+private fun mapAuthError(error: PreludeAuthError): CodedException =
     when (error) {
-        is PreludeSessionError.BadRequest ->
+        is PreludeAuthError.BadRequest ->
             CodedException("bad_request", error.message.orEmpty(), error)
-        is PreludeSessionError.Unauthorized ->
+        is PreludeAuthError.Unauthorized ->
             CodedException("unauthorized", error.message.orEmpty(), error)
-        is PreludeSessionError.RateLimited ->
+        is PreludeAuthError.RateLimited ->
             CodedException("rate_limited", error.message.orEmpty(), error)
-        is PreludeSessionError.InternalServerError ->
+        is PreludeAuthError.InternalServerError ->
             CodedException("internal_server_error", error.message.orEmpty(), error)
-        is PreludeSessionError.MissingChallengeToken ->
+        is PreludeAuthError.MissingChallengeToken ->
             CodedException("missing_challenge_token", error.message.orEmpty(), error)
-        is PreludeSessionError.InvalidChallengeToken ->
+        is PreludeAuthError.InvalidChallengeToken ->
             CodedException("invalid_challenge_token", error.message.orEmpty(), error)
-        is PreludeSessionError.ExpiredChallengeToken ->
+        is PreludeAuthError.ExpiredChallengeToken ->
             CodedException("expired_challenge_token", error.message.orEmpty(), error)
-        is PreludeSessionError.TokenReused ->
+        is PreludeAuthError.TokenReused ->
             CodedException("token_reused", error.message.orEmpty(), error)
-        is PreludeSessionError.InvalidOTPCode ->
+        is PreludeAuthError.InvalidOTPCode ->
             CodedException("invalid_otp_code", error.message.orEmpty(), error)
-        is PreludeSessionError.RefreshFailed ->
+        is PreludeAuthError.RefreshFailed ->
             CodedException("refresh_failed", error.message.orEmpty(), error)
-        is PreludeSessionError.Timeout ->
+        is PreludeAuthError.Timeout ->
             CodedException("timeout", "Request timed out", error)
-        is PreludeSessionError.InvalidConfiguration ->
+        is PreludeAuthError.InvalidConfiguration ->
             CodedException("invalid_configuration", error.message.orEmpty(), error)
-        is PreludeSessionError.InvalidPassword ->
+        is PreludeAuthError.InvalidPassword ->
             CodedException("invalid_password", error.message.orEmpty(), error)
-        is PreludeSessionError.Forbidden ->
+        is PreludeAuthError.Forbidden ->
             CodedException("forbidden", error.message.orEmpty(), error)
-        is PreludeSessionError.InsufficientScope ->
+        is PreludeAuthError.InsufficientScope ->
             CodedException("insufficient_scope", error.message.orEmpty(), error)
-        is PreludeSessionError.NotFound ->
+        is PreludeAuthError.NotFound ->
             CodedException("not_found", error.message.orEmpty(), error)
-        is PreludeSessionError.Conflict ->
+        is PreludeAuthError.Conflict ->
             CodedException("conflict", error.message.orEmpty(), error)
-        is PreludeSessionError.Network ->
+        is PreludeAuthError.Network ->
             CodedException("network", causeMessage(error, "Network error"), error)
-        is PreludeSessionError.CryptoFailure ->
+        is PreludeAuthError.CryptoFailure ->
             CodedException("crypto_failure", causeMessage(error, "Crypto failure"), error)
-        is PreludeSessionError.SignalsDispatchFailed ->
+        is PreludeAuthError.SignalsDispatchFailed ->
             CodedException(
                 "signals_dispatch_failed",
                 causeMessage(error, "Signals dispatch failed"),
                 error,
             )
-        is PreludeSessionError.Generic ->
+        is PreludeAuthError.Generic ->
             CodedException(error.code, error.displayMessage, error)
     }

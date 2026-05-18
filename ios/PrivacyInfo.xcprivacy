@@ -37,7 +37,7 @@
             Required Reason API audit (May 2026):
 
             This pod ships the bridge module + the vendored
-            `PreludeSession` Swift sources (see scripts/postinstall.js).
+            `PreludeAuth` Swift sources (see scripts/postinstall.js).
             Audit-grepped for each Required Reason API category:
 
             - UserDefaults                — not accessed
@@ -48,9 +48,9 @@
             - Disk Space APIs             — not accessed
             - Active Keyboard APIs        — not accessed
 
-            Re-run the audit on every PreludeSession version bump:
+            Re-run the audit on every PreludeAuth version bump:
             `git grep -nE 'UserDefaults|systemUptime|KERN_BOOTTIME|creationDate|modificationDate|attributesOfItem|attributesOfFileSystem|systemFreeSize|TIInputMode' \
-                 ios/sdk/PreludeSession ios/*.swift`
+                 ios/sdk/PreludeAuth ios/*.swift`
             and add matching entries to NSPrivacyAccessedAPITypes
             below. Empty array is the explicit audit result.
         -->

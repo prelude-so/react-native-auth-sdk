@@ -1,22 +1,22 @@
-// PreludeReactNativeSessionSdkModule
+// PreludeReactNativeAuthSdkModule
 //
-// iOS Expo module for the React Native Session SDK. Bridges the
-// JS `PreludeSessionClient` API onto the native `PreludeSession`
-// `PreludeSessionClient` value type.
+// iOS Expo module for the React Native Auth SDK. Bridges the
+// JS `PreludeAuthClient` API onto the native `PreludeAuth`
+// `PreludeAuthClient` value type.
 //
 // Wiring layer only — the registry, codecs, decoders, and method
-// bodies live in `SessionBridge*.swift`. Each `AsyncFunction`
+// bodies live in `AuthBridge*.swift`. Each `AsyncFunction`
 // resolves the bridge instance and delegates, and `wrap` funnels
 // every throw through `mapBridgeError` so JS sees a typed error
 // matching the `fromNativeError` registry on the JS side.
 
 import ExpoModulesCore
 
-public class PreludeReactNativeSessionSdkModule: Module {
-    private let bridge = SessionBridge.shared
+public class PreludeReactNativeAuthSdkModule: Module {
+    private let bridge = AuthBridge.shared
 
     public func definition() -> ModuleDefinition {
-        Name("PreludeReactNativeSessionSdk")
+        Name("PreludeReactNativeAuthSdk")
 
         AsyncFunction("dispose") { (handle: String) in
             // Funnel through `wrap` for parity with every other

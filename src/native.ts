@@ -21,7 +21,7 @@ import { PreludeUserJson } from "./types/user";
  * plugin can lazily provision the underlying client on first
  * use.
  */
-export interface PreludeSessionNativeModule {
+export interface PreludeAuthNativeModule {
   // Lifecycle
   dispose(handle: string): Promise<void>;
 
@@ -110,6 +110,6 @@ export interface PreludeSessionNativeModule {
   ): Promise<number | null>;
 }
 
-export default requireNativeModule<PreludeSessionNativeModule>(
-  "PreludeReactNativeSessionSdk",
+export default requireNativeModule<PreludeAuthNativeModule>(
+  "PreludeReactNativeAuthSdk",
 );

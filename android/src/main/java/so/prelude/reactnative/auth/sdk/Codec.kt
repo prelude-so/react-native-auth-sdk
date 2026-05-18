@@ -1,12 +1,12 @@
-package so.prelude.reactnative.session.sdk
+package so.prelude.reactnative.auth.sdk
 
-import so.prelude.android.session.PreludeJSONValue
-import so.prelude.android.session.PreludeListSessionsResponse
-import so.prelude.android.session.PreludePasswordCompliancy
-import so.prelude.android.session.PreludeProfile
-import so.prelude.android.session.PreludeSessionView
-import so.prelude.android.session.PreludeStepUpChallenge
-import so.prelude.android.session.PreludeUser
+import so.prelude.android.auth.PreludeJSONValue
+import so.prelude.android.auth.PreludeListSessionsResponse
+import so.prelude.android.auth.PreludePasswordCompliancy
+import so.prelude.android.auth.PreludeProfile
+import so.prelude.android.auth.PreludeSessionView
+import so.prelude.android.auth.PreludeStepUpChallenge
+import so.prelude.android.auth.PreludeUser
 import java.time.format.DateTimeFormatter
 
 /** Encodes native value types into JS-friendly maps. */
