@@ -4,6 +4,11 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-05-18
+
+### Fixed
+- Restore compiled `build/` output in published tarball.
+
 ## [0.2.0] - 2026-05-18
 
 First public release. Picks up native auth SDK 0.3.0 (renamed
