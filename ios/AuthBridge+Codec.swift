@@ -84,7 +84,7 @@ enum Codec {
     }
 
     /// Public-surface fields only. The challenge token + expiry
-    /// stay in ``SessionBridge``'s per-handle cache so the bearer
+    /// stay in ``AuthBridge``'s per-handle cache so the bearer
     /// credential never crosses the wire.
     static func encode(challenge: StepUpChallenge) -> [String: Any] {
         [

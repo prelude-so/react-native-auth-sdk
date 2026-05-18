@@ -1,13 +1,13 @@
-package so.prelude.reactnative.session.sdk
+package so.prelude.reactnative.auth.sdk
 
-import so.prelude.android.session.LoginWithPasswordOptions
-import so.prelude.android.session.PreludeIdentifier
-import so.prelude.android.session.PreludeIdentifierType
-import so.prelude.android.session.PreludeListSessionsOptions
-import so.prelude.android.session.PreludeRevokeTarget
-import so.prelude.android.session.PreludeSessionError
-import so.prelude.android.session.RedactedString
-import so.prelude.android.session.StartOTPLoginOptions
+import so.prelude.android.auth.LoginWithPasswordOptions
+import so.prelude.android.auth.PreludeIdentifier
+import so.prelude.android.auth.PreludeIdentifierType
+import so.prelude.android.auth.PreludeListSessionsOptions
+import so.prelude.android.auth.PreludeRevokeTarget
+import so.prelude.android.auth.PreludeAuthError
+import so.prelude.android.auth.RedactedString
+import so.prelude.android.auth.StartOTPLoginOptions
 import java.net.MalformedURLException
 import java.net.URL
 import kotlin.time.Duration
@@ -39,7 +39,7 @@ internal data class ClientConfig(
             val baseUrl = try {
                 URL(address)
             } catch (_: MalformedURLException) {
-                throw PreludeSessionError.InvalidConfiguration(
+                throw PreludeAuthError.InvalidConfiguration(
                     "Endpoint address `$address` is not a valid URL",
                 )
             }

@@ -1,31 +1,14 @@
-# Dependencies
-node_modules/
+# OSX
+#
+.DS_Store
 
-# Single lockfile lives at the workspace root; a per-package one
-# is a `npm install` foot-gun that just adds noise.
-package-lock.json
-
-# Expo CLI cache. Contains absolute paths, so it's per-machine.
-.expo/
-
-# expo-module-scripts compile output. The published tarball includes
-# this (via the `files` field in package.json), but it's regenerated
-# by `npm run prepare` so there's no reason to commit it.
-build/
-
-# Apple Session SDK sources vendored at install time by
-# `scripts/postinstall.js`. The destination tree is reproducible
-# from `apple_session_sdk_tag` in package.json, so it stays out of
-# git. `tmp/` and the staging zip are also extraction artefacts.
-ios/sdk/
-ios/sdk/tmp/
-*.zip
-
-# Standard JS / TypeScript
-*.tsbuildinfo
-.tscache/
+# VSCode
+.vscode/
+jsconfig.json
 
 # Xcode
+#
+build/
 *.pbxuser
 !default.pbxuser
 *.mode1v3
@@ -41,15 +24,38 @@ DerivedData
 *.hmap
 *.ipa
 *.xcuserstate
+project.xcworkspace
 
-# Android / IDEs
-.gradle/
-.cxx/
-.idea/
+# Android/IJ
+#
 .classpath
+.cxx
+.gradle
+.idea
 .project
-.settings/
+.settings
 local.properties
+android.iml
+android/app/libs
+android/keystores/debug.keystore
+android/build
+android/.gradle
 
-# OS
-.DS_Store
+# Cocoapods
+#
+example/ios/Pods
+
+# Ruby
+example/vendor/
+
+# node.js
+#
+node_modules/
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+
+# Expo
+.expo/*
+
+ios/sdk

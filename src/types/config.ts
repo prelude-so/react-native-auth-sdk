@@ -1,7 +1,7 @@
 import { EndpointJson } from "./endpoint";
 
 /**
- * Snapshot of the `PreludeSessionClient` constructor args. Sent
+ * Snapshot of the `PreludeAuthClient` constructor args. Sent
  * alongside every call so the native plugin can lazily construct
  * the underlying client on first use without an explicit init step.
  *

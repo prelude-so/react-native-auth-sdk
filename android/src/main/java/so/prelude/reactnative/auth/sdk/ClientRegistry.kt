@@ -1,11 +1,11 @@
-package so.prelude.reactnative.session.sdk
+package so.prelude.reactnative.auth.sdk
 
 import android.content.Context
 import android.content.pm.PackageManager
-import so.prelude.android.session.PreludeSessionClient
-import so.prelude.android.session.PreludeSessionError
-import so.prelude.android.session.PreludeStepUpChallenge
-import so.prelude.android.session.PreludeStepUpStatus
+import so.prelude.android.auth.PreludeAuthClient
+import so.prelude.android.auth.PreludeAuthError
+import so.prelude.android.auth.PreludeStepUpChallenge
+import so.prelude.android.auth.PreludeStepUpStatus
 
 /**
  * `AndroidManifest.xml` meta-data key the SDK reads for the
@@ -45,7 +45,7 @@ internal fun resolveSignalsSDKKey(context: Context, override: String?): String? 
  * bearer challenge JWT off the JS side.
  */
 internal class ClientRegistry {
-    private val clients: MutableMap<String, PreludeSessionClient> = mutableMapOf()
+    private val clients: MutableMap<String, PreludeAuthClient> = mutableMapOf()
     private val challenges: MutableMap<String, MutableMap<String, PreludeStepUpChallenge>> =
         mutableMapOf()
     private val lock = Any()
@@ -53,7 +53,7 @@ internal class ClientRegistry {
     /**
      * Lookup-or-create runs inside the same lock on purpose: a split
      * read-then-write would let two callers for the same handle both
-     * miss the cache, both run the `PreludeSessionClient` constructor
+     * miss the cache, both run the `PreludeAuthClient` constructor
      * (which provisions DPoP key state via Keystore), and the second
      * writer would win — leaving the loser's keystore footprint with
      * no JS-side reference to dispose it.
@@ -62,16 +62,16 @@ internal class ClientRegistry {
         context: Context,
         handle: String,
         configRaw: Map<*, *>,
-    ): PreludeSessionClient =
+    ): PreludeAuthClient =
         synchronized(lock) {
             clients[handle]?.let { return@synchronized it }
             val config = ClientConfig.decode(configRaw)
             val signalsKey = resolveSignalsSDKKey(context, config.signalsKeyOverride)
             // Adapter no-ops when `sdkKey` is null, so we always
             // pass it through. Hides the manifest / override choice
-            // from the session client.
+            // from the auth client.
             val dispatcher = PreludeSignalsAdapter(context, signalsKey)
-            val client = PreludeSessionClient(
+            val client = PreludeAuthClient(
                 context = context,
                 baseUrl = config.baseUrl,
                 hostOverride = config.hostOverride,
@@ -138,7 +138,7 @@ internal class ClientRegistry {
      */
     fun lookupChallenge(handle: String, challengeId: String): PreludeStepUpChallenge {
         val found = synchronized(lock) { challenges[handle]?.get(challengeId) }
-        return found ?: throw PreludeSessionError.InvalidChallengeToken(
+        return found ?: throw PreludeAuthError.InvalidChallengeToken(
             "Step-up challenge `$challengeId` not found. " +
                 "Pass the value returned by requestStepUp / submitStepUpOTP " +
                 "unchanged, or call requestStepUp(scope) again.",

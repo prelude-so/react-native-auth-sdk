@@ -1,4 +1,4 @@
-// Per-process registry of native ``PreludeSessionClient``s, keyed
+// Per-process registry of native ``PreludeAuthClient``s, keyed
 // by the JS-stamped handle. Native clients are created lazily on
 // first use and reused across calls so DPoP keys, refresh tokens
 // and the access-token cache stay stable for the lifetime of the
@@ -16,16 +16,16 @@
 
 import Foundation
 
-final class SessionBridge {
+final class AuthBridge {
     /// Shared instance: the Expo `Module` is reinitialised on
     /// reload, so the registry lives above it. The Module's
     /// `OnDestroy` calls ``clearAll()`` so reloads don't leak
     /// orphaned clients — JS handles aren't persisted across
     /// reload, so old entries would otherwise become unreachable.
-    static let shared = SessionBridge()
+    static let shared = AuthBridge()
 
-    private var clients: [String: PreludeSessionClient] = [:]
-    private var pendingResolves: [String: Task<PreludeSessionClient, Error>] = [:]
+    private var clients: [String: PreludeAuthClient] = [:]
+    private var pendingResolves: [String: Task<PreludeAuthClient, Error>] = [:]
     private var challenges: [String: [String: StepUpChallenge]] = [:]
 
     /// Single serial queue covers all three maps. Their lifetimes
@@ -34,7 +34,7 @@ final class SessionBridge {
     /// express. Held only for dictionary reads / writes; the
     /// expensive provisioning work runs outside.
     private let queue = DispatchQueue(
-        label: "so.prelude.reactnative.session.registry"
+        label: "so.prelude.reactnative.auth.registry"
     )
 
     // MARK: - Client resolution
@@ -52,20 +52,20 @@ final class SessionBridge {
     func resolveClient(
         handle: String,
         configRaw: [String: Any]
-    ) async throws -> PreludeSessionClient {
+    ) async throws -> PreludeAuthClient {
         // Fast path.
         if let existing = queue.sync(execute: { clients[handle] }) {
             return existing
         }
         // Slow path: pick or stage the single-flight Task under the lock.
-        let task: Task<PreludeSessionClient, Error> = queue.sync {
+        let task: Task<PreludeAuthClient, Error> = queue.sync {
             // Re-check after acquiring the lock: a concurrent caller
             // may have just settled the cache.
             if let existing = clients[handle] {
                 return Task { existing }
             }
             if let pending = pendingResolves[handle] { return pending }
-            let new = Task<PreludeSessionClient, Error> {
+            let new = Task<PreludeAuthClient, Error> {
                 try Self.provisionClient(configRaw: configRaw)
             }
             pendingResolves[handle] = new
@@ -89,15 +89,15 @@ final class SessionBridge {
 
     private static func provisionClient(
         configRaw: [String: Any]
-    ) throws -> PreludeSessionClient {
+    ) throws -> PreludeAuthClient {
         let config = try ClientConfig(decoding: configRaw)
         let signalsKey = resolveSignalsSDKKey(keyOverride: config.signalsKeyOverride)
         // Adapter no-ops when the key is nil, so we always pass it
         // through. Hides the manifest / override decision from the
-        // session client.
+        // auth client.
         let dispatcher: PreludeSignalsDispatcher =
             ReactNativePreludeSignalsAdapter(sdkKey: signalsKey)
-        return try PreludeSessionClient(
+        return try PreludeAuthClient(
             endpoint: config.endpoint,
             hostOverride: config.hostOverride,
             signalsDispatcher: dispatcher,
@@ -164,7 +164,7 @@ final class SessionBridge {
     }
 
     /// Resolve a JS-side `challengeID` back to its cached value, or
-    /// throw ``PreludeSessionError/invalidChallengeToken`` so the
+    /// throw ``PreludeAuthError/invalidChallengeToken`` so the
     /// consumer recovers via ``requestStepUp``.
     func lookupChallenge(
         handle: String,
@@ -173,7 +173,7 @@ final class SessionBridge {
         var found: StepUpChallenge?
         queue.sync { found = challenges[handle]?[challengeID] }
         guard let challenge = found else {
-            throw PreludeSessionError.invalidChallengeToken(
+            throw PreludeAuthError.invalidChallengeToken(
                 "Step-up challenge `\(challengeID)` not found. " +
                 "Pass the value returned by requestStepUp / submitStepUpOTP " +
                 "unchanged, or call requestStepUp(scope:) again."

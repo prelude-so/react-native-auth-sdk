@@ -3,7 +3,7 @@
 
 import Foundation
 
-extension SessionBridge {
+extension AuthBridge {
     // MARK: - Refresh / logout / invalidate
 
     func refresh(handle: String, configRaw: [String: Any]) async throws -> [String: Any] {

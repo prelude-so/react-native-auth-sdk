@@ -13,8 +13,8 @@ func mapBridgeError(_ error: Error) -> Exception {
     if let exc = error as? Exception {
         return exc
     }
-    if let e = error as? PreludeSessionError {
-        return mapSessionError(e)
+    if let e = error as? PreludeAuthError {
+        return mapAuthError(e)
     }
     if let e = error as? BridgeDecodeError {
         return Exception(name: "BadRequest", description: e.message, code: "bad_request")
@@ -29,7 +29,7 @@ func mapBridgeError(_ error: Error) -> Exception {
 // `cryptoFailure` and `signalsDispatchFailed` are not currently
 // emitted on this platform; the JS registry has them ready to
 // hydrate if the native enum gains those cases.
-private func mapSessionError(_ error: PreludeSessionError) -> Exception {
+private func mapAuthError(_ error: PreludeAuthError) -> Exception {
     let (code, message) = codeAndMessage(error)
     return Exception(
         name: nameFor(code: code),
@@ -39,7 +39,7 @@ private func mapSessionError(_ error: PreludeSessionError) -> Exception {
 }
 
 // swiftlint:disable cyclomatic_complexity
-private func codeAndMessage(_ error: PreludeSessionError) -> (String, String) {
+private func codeAndMessage(_ error: PreludeAuthError) -> (String, String) {
     switch error {
     case .badRequest(let m): return ("bad_request", m)
     case .unauthorized(let m): return ("unauthorized", m)

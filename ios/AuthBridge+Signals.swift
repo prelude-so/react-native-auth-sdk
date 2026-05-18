@@ -1,6 +1,6 @@
 // Stub adapter for Prelude signals on iOS. The Prelude signals
 // SDK isn't bundled in this pod, so the adapter always returns
-// `nil` — the session client treats that as "no signals", and
+// `nil` — the auth client treats that as "no signals", and
 // `dispatch_id` is omitted from login bodies.
 
 import Foundation

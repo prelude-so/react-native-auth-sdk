@@ -1,6 +1,6 @@
 export {
-  PreludeSessionClient,
-  PreludeSessionClientOptions,
+  PreludeAuthClient,
+  PreludeAuthClientOptions,
   RequestStepUpOptions,
 } from "./client";
 
@@ -44,7 +44,7 @@ export {
   MissingChallengeTokenError,
   NetworkError,
   NotFoundError,
-  PreludeSessionError,
+  PreludeAuthError,
   RateLimitedError,
   RefreshFailedError,
   SignalsDispatchFailedError,
