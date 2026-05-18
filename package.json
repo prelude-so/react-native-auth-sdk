@@ -1,6 +1,6 @@
 {
   "name": "@prelude.so/react-native-auth-sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Prelude Auth SDK for React Native — OTP login, password login, refresh, step-up, and signed sessions on iOS and Android.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -10,10 +10,9 @@
     "clean": "expo-module clean",
     "lint": "expo-module lint",
     "test": "expo-module test --selectProjects Node Web",
+    "prepare": "expo-module prepare",
     "prepublishOnly": "expo-module prepublishOnly",
-    "expo-module": "expo-module",
-    "postinstall": "node scripts/postinstall.js",
-    "smoke": "bash scripts/check-install.sh"
+    "postinstall": "node scripts/postinstall.js"
   },
   "keywords": [
     "react-native",
