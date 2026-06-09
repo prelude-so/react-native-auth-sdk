@@ -4,6 +4,38 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-06-04
+
+### Added
+- React hooks layer under `@prelude.so/react-native-auth-sdk/react`:
+  `PreludeAuthProvider` (silent session restore on mount, with an
+  `onRestored` callback), the `useAuth`, `useSignIn`, and `useStepUp`
+  hooks, and the `SignedIn` / `SignedOut` / `AuthLoading` render
+  gates. The imperative `PreludeAuthClient` API is unchanged.
+- `canChangePassword()` — `true` when the session's access token
+  already carries `prld:pwd:write`.
+- `NoActiveStepUpError` (`no_active_step_up`), thrown by hook
+  step-up actions invoked without an active challenge.
+
+### Changed
+- Signals dispatch is now best-effort: a failed dispatch no longer
+  aborts login; the call proceeds without a `dispatch_id`.
+
+### Removed
+- `SignalsDispatchFailedError` and the `signals_dispatch_failed`
+  error code, obsolete with best-effort dispatch.
+
+### Fixed
+- Picks up native auth SDK 0.4.0 fixes: DPoP proofs compensate for
+  device clock skew (with one retry on `invalid_dpop_proof`),
+  race-safe profile / access-token reads, and no redundant refresh
+  when a 401 races another caller's refresh.
+
+### Native dependencies
+- iOS `PreludeAuth` `0.4.0`
+- Android `so.prelude.android:auth-sdk:0.4.0`
+- Android `so.prelude.android:sdk:0.5.2` (signals)
+
 ## [0.2.1] - 2026-05-18
 
 ### Fixed

@@ -33,8 +33,6 @@ class ErrorsTest {
             PreludeAuthError.Conflict("x") to "conflict",
             PreludeAuthError.Network(IOException("offline")) to "network",
             PreludeAuthError.CryptoFailure(IllegalStateException("ks")) to "crypto_failure",
-            PreludeAuthError.SignalsDispatchFailed(IllegalStateException("dispatch"))
-                to "signals_dispatch_failed",
             PreludeAuthError.Generic("teapot", "418") to "teapot",
         )
         for ((error, expectedCode) in cases) {
@@ -90,10 +88,8 @@ class CauseMessageFallbackTest {
     }
 
     @Test
-    fun `CryptoFailure and SignalsDispatchFailed share the same fallback shape`() {
+    fun `CryptoFailure falls back to a triage-friendly default message`() {
         val cf = mapError(PreludeAuthError.CryptoFailure(IllegalStateException("")))
-        val sf = mapError(PreludeAuthError.SignalsDispatchFailed(IllegalStateException("")))
         assertTrue(cf.message!!.contains("Crypto failure"), cf.message)
-        assertTrue(sf.message!!.contains("Signals dispatch failed"), sf.message)
     }
 }

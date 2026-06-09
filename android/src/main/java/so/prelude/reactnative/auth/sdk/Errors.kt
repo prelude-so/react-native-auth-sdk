@@ -86,12 +86,6 @@ private fun mapAuthError(error: PreludeAuthError): CodedException =
             CodedException("network", causeMessage(error, "Network error"), error)
         is PreludeAuthError.CryptoFailure ->
             CodedException("crypto_failure", causeMessage(error, "Crypto failure"), error)
-        is PreludeAuthError.SignalsDispatchFailed ->
-            CodedException(
-                "signals_dispatch_failed",
-                causeMessage(error, "Signals dispatch failed"),
-                error,
-            )
         is PreludeAuthError.Generic ->
             CodedException(error.code, error.displayMessage, error)
     }

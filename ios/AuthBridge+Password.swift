@@ -26,4 +26,11 @@ extension AuthBridge {
         let client = try await resolveClient(handle: handle, configRaw: configRaw)
         try await client.changePassword(RedactedString(newPassword))
     }
+
+    func canChangePassword(
+        handle: String, configRaw: [String: Any]
+    ) async throws -> Bool {
+        let client = try await resolveClient(handle: handle, configRaw: configRaw)
+        return try await client.canChangePassword()
+    }
 }
