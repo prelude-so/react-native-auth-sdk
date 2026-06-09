@@ -47,6 +47,9 @@ public class PreludeReactNativeAuthSdkModule: Module {
         AsyncFunction("changePassword") { (h: String, c: [String: Any], pwd: String) in
             try await self.wrap { try await self.bridge.changePassword(handle: h, configRaw: c, newPassword: pwd) }
         }
+        AsyncFunction("canChangePassword") { (h: String, c: [String: Any]) -> Bool in
+            try await self.wrap { try await self.bridge.canChangePassword(handle: h, configRaw: c) }
+        }
 
         // Refresh / logout / invalidate -----------------------------
         AsyncFunction("refresh") { (h: String, c: [String: Any]) -> [String: Any] in

@@ -194,6 +194,20 @@ export class PreludeAuthClient {
     );
   }
 
+  /**
+   * Whether the current session can call `changePassword` without
+   * going through step-up first — i.e. whether its access token
+   * already carries `prld:pwd:write`.
+   *
+   * Call before driving a "change password" UI to decide whether
+   * to prompt for step-up. Throws if the session refresh fails;
+   * returns `false` when the refreshed token lacks the scope or
+   * the claim is missing/malformed.
+   */
+  canChangePassword(): Promise<boolean> {
+    return this.invoke(() => native.canChangePassword(this.handle, this.config));
+  }
+
   // ---------- Refresh / logout / invalidate ----------
 
   /**

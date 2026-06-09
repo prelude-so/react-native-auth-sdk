@@ -52,6 +52,15 @@ export const InvalidOTPCodeError = subclass(
   "invalid_otp_code",
   "InvalidOTPCodeError",
 );
+/**
+ * Thrown by React hook actions when the caller invokes a step-up
+ * action without an active challenge in store state (e.g. calling
+ * `sendStepUpOtp()` before `requestStepUp()`).
+ */
+export const NoActiveStepUpError = subclass(
+  "no_active_step_up",
+  "NoActiveStepUpError",
+);
 export const RefreshFailedError = subclass(
   "refresh_failed",
   "RefreshFailedError",
@@ -77,15 +86,6 @@ export const InsufficientScopeError = subclass(
 export const CryptoFailureError = subclass(
   "crypto_failure",
   "CryptoFailureError",
-);
-/**
- * The Prelude signals SDK failed to dispatch. Login is aborted because
- * the server expects a `dispatch_id`. Currently surfaced by the
- * Android native SDK only.
- */
-export const SignalsDispatchFailedError = subclass(
-  "signals_dispatch_failed",
-  "SignalsDispatchFailedError",
 );
 export const NetworkError = subclass("network", "NetworkError");
 
@@ -124,7 +124,6 @@ const REGISTRY: Record<string, new (m: string) => PreludeAuthError> = {
   invalid_password: InvalidPasswordError,
   insufficient_scope: InsufficientScopeError,
   crypto_failure: CryptoFailureError,
-  signals_dispatch_failed: SignalsDispatchFailedError,
   network: NetworkError,
 };
 

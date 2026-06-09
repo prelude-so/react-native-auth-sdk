@@ -36,10 +36,9 @@ internal class PreludeSignalsAdapter(
         val client = prelude ?: return null
         // The suspend variant returns `Result<String>`. Throw on
         // failure — the auth SDK's `dispatchSignalsIfConfigured`
-        // wraps it as `PreludeAuthError.SignalsDispatchFailed`,
-        // which `mapError` then surfaces to JS as
-        // `signals_dispatch_failed`. Cooperative cancellation
-        // propagates untouched.
+        // catches and logs it, and the login proceeds without
+        // `dispatch_id` (anti-fraud coverage degrades gracefully).
+        // Cooperative cancellation propagates untouched.
         return client.dispatchSignals().getOrThrow()
     }
 }

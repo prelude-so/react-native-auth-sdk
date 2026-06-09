@@ -17,7 +17,6 @@ import {
   PreludeAuthError,
   RateLimitedError,
   RefreshFailedError,
-  SignalsDispatchFailedError,
   TimeoutError,
   TokenReusedError,
   UnauthorizedError,
@@ -44,7 +43,6 @@ describe("fromNativeError", () => {
     ["invalid_password", InvalidPasswordError],
     ["insufficient_scope", InsufficientScopeError],
     ["crypto_failure", CryptoFailureError],
-    ["signals_dispatch_failed", SignalsDispatchFailedError],
     ["network", NetworkError],
   ];
 

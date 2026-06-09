@@ -53,6 +53,7 @@ export interface PreludeAuthNativeModule {
     config: ConfigJson,
     newPassword: string,
   ): Promise<void>;
+  canChangePassword(handle: string, config: ConfigJson): Promise<boolean>;
 
   // Refresh / logout / invalidate
   refresh(handle: string, config: ConfigJson): Promise<PreludeUserJson>;

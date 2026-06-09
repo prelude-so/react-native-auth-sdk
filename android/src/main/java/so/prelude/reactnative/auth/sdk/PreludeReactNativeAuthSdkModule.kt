@@ -29,6 +29,7 @@ import so.prelude.android.auth.PreludeAuthError
 import so.prelude.android.auth.PreludeStepUpStatus
 import so.prelude.android.auth.RedactedString
 import so.prelude.android.auth.changePassword
+import so.prelude.android.auth.canChangePassword
 import so.prelude.android.auth.checkOTP
 import so.prelude.android.auth.getPasswordCompliancy
 import so.prelude.android.auth.listSessions
@@ -88,6 +89,10 @@ class PreludeReactNativeAuthSdkModule : Module() {
             AsyncFunction("changePassword") Coroutine {
                 handle: String, config: Map<String, Any?>, newPassword: String ->
                 withClient(handle, config) { it.changePassword(RedactedString(newPassword)) }
+            }
+            AsyncFunction("canChangePassword") Coroutine {
+                handle: String, config: Map<String, Any?> ->
+                withClient(handle, config) { it.canChangePassword() }
             }
 
             // Refresh / logout / invalidate -------------------------

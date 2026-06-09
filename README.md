@@ -32,6 +32,36 @@ await client.startOTPLogin({
 const user = await client.checkOTP("123456");
 ```
 
+### React hooks
+
+The SDK also ships a React layer — import from
+`@prelude.so/react-native-auth-sdk/react`:
+
+```tsx
+import {
+  AuthLoading,
+  PreludeAuthProvider,
+  SignedIn,
+  SignedOut,
+} from "@prelude.so/react-native-auth-sdk/react";
+
+<PreludeAuthProvider
+  options={{ endpoint: Endpoint.custom("https://<your-app>.session.prelude.dev") }}
+>
+  <AuthLoading><Splash /></AuthLoading>
+  <SignedOut><LoginScreen /></SignedOut>
+  <SignedIn><Home /></SignedIn>
+</PreludeAuthProvider>
+```
+
+`PreludeAuthProvider` restores a cached session on mount and the
+gates render the matching subtree. `useSignIn` drives OTP and
+password login, `useAuth` exposes session state plus `refresh` /
+`signOut` / `changePassword`, and `useStepUp` drives step-up
+challenges. Each hook scopes its `pending` / `error` to its own
+actions, and every hook action resolves instead of throwing —
+failures land in `error`.
+
 ### Requirements
 
 - iOS deployment target **15.1+**
@@ -195,7 +225,7 @@ Android — add a `<meta-data>` entry inside `<application>` in
     android:value="sdk_android_XXXXXXXXXXXXXXXX" />
 ```
 
-> **Platform note (v0.2.0):** signals dispatch is currently active
+> **Platform note (v0.3.0):** signals dispatch is currently active
 > on Android only. iOS accepts the same configuration surface and
 > is wire-compatible, but `dispatch_id` is not attached on iOS in
 > this release. Full iOS support lands in a follow-up.
