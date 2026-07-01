@@ -124,3 +124,16 @@ class DecodeMetadataTest {
         assertTrue(e.message!!.contains("retry_count"))
     }
 }
+
+class DecodeMigrateOptionsTest {
+    @Test
+    fun `decodes a token`() {
+        val opts = decodeMigrateOptions(mapOf("token" to "legacy_xyz"))
+        assertEquals("legacy_xyz", opts.token.value)
+    }
+
+    @Test
+    fun `missing token fails loudly`() {
+        assertFailsWith<DecodeException> { decodeMigrateOptions(emptyMap<String, Any?>()) }
+    }
+}

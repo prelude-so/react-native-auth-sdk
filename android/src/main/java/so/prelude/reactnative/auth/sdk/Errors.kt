@@ -70,6 +70,8 @@ private fun mapAuthError(error: PreludeAuthError): CodedException =
             CodedException("refresh_failed", error.message.orEmpty(), error)
         is PreludeAuthError.Timeout ->
             CodedException("timeout", "Request timed out", error)
+        is PreludeAuthError.Cancelled ->
+            CodedException("cancelled", "Request cancelled", error)
         is PreludeAuthError.InvalidConfiguration ->
             CodedException("invalid_configuration", error.message.orEmpty(), error)
         is PreludeAuthError.InvalidPassword ->
@@ -80,6 +82,8 @@ private fun mapAuthError(error: PreludeAuthError): CodedException =
             CodedException("insufficient_scope", error.message.orEmpty(), error)
         is PreludeAuthError.NotFound ->
             CodedException("not_found", error.message.orEmpty(), error)
+        is PreludeAuthError.SamlLoginRequired ->
+            CodedException("saml_login_required", error.message.orEmpty(), error)
         is PreludeAuthError.Conflict ->
             CodedException("conflict", error.message.orEmpty(), error)
         is PreludeAuthError.Network ->

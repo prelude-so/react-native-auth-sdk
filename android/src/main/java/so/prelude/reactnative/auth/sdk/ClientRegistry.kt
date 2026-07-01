@@ -2,10 +2,12 @@ package so.prelude.reactnative.auth.sdk
 
 import android.content.Context
 import android.content.pm.PackageManager
+import so.prelude.android.auth.OAuthEmailChallenge
 import so.prelude.android.auth.PreludeAuthClient
 import so.prelude.android.auth.PreludeAuthError
 import so.prelude.android.auth.PreludeStepUpChallenge
 import so.prelude.android.auth.PreludeStepUpStatus
+import java.util.UUID
 
 /**
  * `AndroidManifest.xml` meta-data key the SDK reads for the
@@ -48,6 +50,8 @@ internal class ClientRegistry {
     private val clients: MutableMap<String, PreludeAuthClient> = mutableMapOf()
     private val challenges: MutableMap<String, MutableMap<String, PreludeStepUpChallenge>> =
         mutableMapOf()
+    private val oauthChallenges: MutableMap<String, MutableMap<String, OAuthEmailChallenge>> =
+        mutableMapOf()
     private val lock = Any()
 
     /**
@@ -87,6 +91,7 @@ internal class ClientRegistry {
         synchronized(lock) {
             clients.remove(handle)
             challenges.remove(handle)
+            oauthChallenges.remove(handle)
         }
     }
 
@@ -95,6 +100,7 @@ internal class ClientRegistry {
         synchronized(lock) {
             clients.clear()
             challenges.clear()
+            oauthChallenges.clear()
         }
     }
 
@@ -142,6 +148,46 @@ internal class ClientRegistry {
             "Step-up challenge `$challengeId` not found. " +
                 "Pass the value returned by requestStepUp / submitStepUpOTP " +
                 "unchanged, or call requestStepUp(scope) again.",
+        )
+    }
+
+    /**
+     * Stash the [OAuthEmailChallenge] from an `otpRequired` login
+     * under a freshly minted opaque id and return that id. Only the id
+     * crosses the bridge, so the verification token it carries never
+     * leaves the device. A write that races [dispose] / [clear]
+     * silently no-ops.
+     */
+    fun cacheOAuthChallenge(handle: String, challenge: OAuthEmailChallenge): String {
+        val id = UUID.randomUUID().toString()
+        synchronized(lock) {
+            // Don't resurrect entries for a disposed handle.
+            if (clients[handle] == null) return id
+            val slot = oauthChallenges.getOrPut(handle) { mutableMapOf() }
+            slot[id] = challenge
+        }
+        return id
+    }
+
+    fun evictOAuthChallenge(handle: String, challengeId: String) {
+        synchronized(lock) {
+            val slot = oauthChallenges[handle] ?: return
+            slot.remove(challengeId)
+            if (slot.isEmpty()) oauthChallenges.remove(handle)
+        }
+    }
+
+    /**
+     * Resolve a JS-side challengeId back to the cached challenge.
+     * Throws `InvalidChallengeToken` when unknown to this registry;
+     * recover by restarting the OAuth login.
+     */
+    fun lookupOAuthChallenge(handle: String, challengeId: String): OAuthEmailChallenge {
+        val found = synchronized(lock) { oauthChallenges[handle]?.get(challengeId) }
+        return found ?: throw PreludeAuthError.InvalidChallengeToken(
+            "OAuth email challenge `$challengeId` not found. " +
+                "Pass the value returned by finalizeOAuthLogin / loginWithOAuth " +
+                "unchanged, or restart the OAuth login.",
         )
     }
 }

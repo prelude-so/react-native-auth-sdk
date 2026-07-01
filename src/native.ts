@@ -1,6 +1,12 @@
 import { requireNativeModule } from "expo-modules-core";
 
 import { ConfigJson } from "./types/config";
+import { MigrateOptionsJson } from "./types/migrate";
+import {
+  FinalizeOAuthLoginResultJson,
+  InitiateOAuthLoginOptionsJson,
+  OAuthLoginOptionsJson,
+} from "./types/oauth";
 import { StartOTPLoginOptionsJson } from "./types/otp";
 import {
   LoginWithPasswordOptionsJson,
@@ -54,6 +60,41 @@ export interface PreludeAuthNativeModule {
     newPassword: string,
   ): Promise<void>;
   canChangePassword(handle: string, config: ConfigJson): Promise<boolean>;
+
+  // Migration
+  migrate(
+    handle: string,
+    config: ConfigJson,
+    options: MigrateOptionsJson,
+  ): Promise<PreludeUserJson>;
+  // Social / OAuth login
+  loginWithOAuth(
+    handle: string,
+    config: ConfigJson,
+    options: OAuthLoginOptionsJson,
+  ): Promise<FinalizeOAuthLoginResultJson>;
+  /** Resolves with the provider authorization URL as a string. */
+  initiateOAuthLogin(
+    handle: string,
+    config: ConfigJson,
+    options: InitiateOAuthLoginOptionsJson,
+  ): Promise<string>;
+  finalizeOAuthLogin(
+    handle: string,
+    config: ConfigJson,
+    challengeToken: string,
+  ): Promise<FinalizeOAuthLoginResultJson>;
+  /**
+   * Redeem an email OTP for an `otp_required` OAuth result. The
+   * `challengeID` resolves the native-cached challenge whose
+   * verification token never crossed the bridge.
+   */
+  checkOAuthEmailOTP(
+    handle: string,
+    config: ConfigJson,
+    challengeID: string,
+    code: string,
+  ): Promise<PreludeUserJson>;
 
   // Refresh / logout / invalidate
   refresh(handle: string, config: ConfigJson): Promise<PreludeUserJson>;

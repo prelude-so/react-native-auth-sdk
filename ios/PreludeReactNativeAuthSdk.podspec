@@ -23,9 +23,11 @@ Pod::Spec.new do |s|
     'SWIFT_COMPILATION_MODE' => 'wholemodule'
   }
 
-  # PreludeAuth is vendored at install time by
+  # PreludeAuth and PreludeAuthSocial are vendored at install time by
   # `scripts/postinstall.js` (driven by `apple_auth_sdk_tag` in
-  # `package.json`) into `ios/sdk/PreludeAuth/`.
+  # `package.json`) into `ios/sdk/`. PreludeAuthSocial carries the
+  # OAuth web-login surface; its `import PreludeAuth` lines are
+  # stripped post-vendor since both trees merge into this one module.
   #
   # Source globs are kept narrow — only the bridge module at the pod
   # root and the vendored `sdk/PreludeAuth/` tree. Earlier we used
@@ -35,6 +37,7 @@ Pod::Spec.new do |s|
   s.source_files = [
     '*.swift',
     'sdk/PreludeAuth/**/*.swift',
+    'sdk/PreludeAuthSocial/**/*.swift',
   ]
 
   # `Signals/PreludeSignalsAdapter.swift` imports the edge `Prelude`

@@ -4,6 +4,50 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] - 2026-07-01
+
+### Added
+- Social login. `loginWithOAuth(options)` presents an identity
+  provider (Google, Apple, Microsoft, GitHub, Okta, Facebook) in a
+  system web session and establishes a session in one call;
+  `initiateOAuthLogin` / `finalizeOAuthLogin` back it for apps that
+  present the web session themselves. Exposed on `PreludeAuthClient`
+  and the `useSignIn` hook. New `CancelledError` for a dismissed page.
+- OAuth logins that require email verification (e.g. Microsoft) now
+  resolve with an `OAuthEmailChallenge` in the `otpRequired` result.
+  Redeem it with `checkOAuthEmailOTP(code, resuming)` on
+  `PreludeAuthClient`, or `checkOAuthEmailOtp(code, challenge)` on the
+  `useSignIn` hook, to finish the login. The challenge is an opaque
+  handle; its verification token stays on the device, so concurrent
+  logins stay isolated.
+
+### Native dependencies
+- iOS `PreludeAuth` `0.6.0`
+- Android `so.prelude.android:auth-sdk:0.6.0`
+- Android `so.prelude.android:sdk:0.5.2` (signals)
+
+## [0.4.0] - 2026-06-12
+
+### Added
+- `migrate(options)` on `PreludeAuthClient` — exchange a legacy
+  bearer token for a Prelude session via PKCE-bound `/migration` ⇒
+  `/login/finalize`. Idempotent (a cached session short-circuits)
+  and single-flight (concurrent callers share one exchange), so the
+  legacy token is spent at most once. The token is taken as a
+  `RedactedString` so it never leaks through `toString` /
+  `console.log`.
+- `migrate(legacyToken)` on the `useSignIn` hook — the same exchange
+  surfaced through the React hooks layer, landing on `signedIn`.
+
+### Changed
+- Bumped the native auth dependencies to `0.5.0` (which add
+  `migrate`): iOS `PreludeAuth` and `so.prelude.android:auth-sdk`.
+
+### Native dependencies
+- iOS `PreludeAuth` `0.5.0`
+- Android `so.prelude.android:auth-sdk:0.5.0`
+- Android `so.prelude.android:sdk:0.5.2` (signals)
+
 ## [0.3.0] - 2026-06-04
 
 ### Added

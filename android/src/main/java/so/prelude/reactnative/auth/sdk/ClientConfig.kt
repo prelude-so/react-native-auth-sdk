@@ -1,6 +1,7 @@
 package so.prelude.reactnative.auth.sdk
 
 import so.prelude.android.auth.LoginWithPasswordOptions
+import so.prelude.android.auth.MigrateOptions
 import so.prelude.android.auth.PreludeIdentifier
 import so.prelude.android.auth.PreludeIdentifierType
 import so.prelude.android.auth.PreludeListSessionsOptions
@@ -8,6 +9,9 @@ import so.prelude.android.auth.PreludeRevokeTarget
 import so.prelude.android.auth.PreludeAuthError
 import so.prelude.android.auth.RedactedString
 import so.prelude.android.auth.StartOTPLoginOptions
+import so.prelude.android.auth.InitiateOAuthLoginOptions
+import so.prelude.android.auth.OAuthProvider
+import so.prelude.android.auth.social.OAuthLoginOptions
 import java.net.MalformedURLException
 import java.net.URL
 import kotlin.time.Duration
@@ -90,6 +94,52 @@ internal fun decodeLoginWithPasswordOptions(raw: Any?): LoginWithPasswordOptions
     return LoginWithPasswordOptions(
         identifier = email,
         password = RedactedString(password),
+    )
+}
+
+internal fun decodeMigrateOptions(raw: Any?): MigrateOptions {
+    val json = raw as? Map<*, *>
+        ?: throw decodeError("MigrateOptions: malformed payload")
+    val token = json["token"] as? String
+        ?: throw decodeError("MigrateOptions: malformed payload")
+    // Wrap in [RedactedString] at the bridge boundary so the only
+    // named local holding the plaintext is `token` above.
+    return MigrateOptions(RedactedString(token))
+}
+
+/**
+ * Resolve a wire provider string to its [OAuthProvider], matched on
+ * the constant name case-insensitively — valid while every wire value
+ * is its name lowercased. An unknown value fails loudly so a typo
+ * can't silently pick the wrong IdP.
+ */
+private fun decodeOAuthProvider(raw: Any?): OAuthProvider {
+    val wire = raw as? String ?: throw decodeError("OAuthOptions: missing provider")
+    return OAuthProvider.entries.firstOrNull { it.name.equals(wire, ignoreCase = true) }
+        ?: throw decodeError("Unknown OAuthProvider: $wire")
+}
+
+internal fun decodeOAuthLoginOptions(raw: Any?): OAuthLoginOptions {
+    val json = raw as? Map<*, *>
+        ?: throw decodeError("OAuthLoginOptions: malformed payload")
+    val redirectUri = json["redirectUri"] as? String
+        ?: throw decodeError("OAuthLoginOptions: missing redirectUri")
+    // `prefersEphemeralSession` is intentionally not threaded: the
+    // Custom Tab has no ephemeral-session toggle.
+    return OAuthLoginOptions(
+        provider = decodeOAuthProvider(json["provider"]),
+        redirectUri = redirectUri,
+    )
+}
+
+internal fun decodeInitiateOAuthLoginOptions(raw: Any?): InitiateOAuthLoginOptions {
+    val json = raw as? Map<*, *>
+        ?: throw decodeError("InitiateOAuthLoginOptions: malformed payload")
+    val redirectUri = json["redirectUri"] as? String
+        ?: throw decodeError("InitiateOAuthLoginOptions: missing redirectUri")
+    return InitiateOAuthLoginOptions(
+        provider = decodeOAuthProvider(json["provider"]),
+        redirectUri = redirectUri,
     )
 }
 

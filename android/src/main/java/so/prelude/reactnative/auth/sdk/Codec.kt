@@ -69,6 +69,18 @@ internal object Codec {
             "requestedScope" to c.requestedScope,
         )
 
+    /** `logged_in` arm of the OAuth login outcome. */
+    fun encodeOAuthLoggedIn(user: PreludeUser): Map<String, Any?> =
+        mapOf("kind" to "logged_in", "user" to encodeUser(user))
+
+    /**
+     * `otp_required` arm. [challengeId] is the opaque registry key for
+     * the cached challenge; the verification token it holds never
+     * crosses the bridge.
+     */
+    fun encodeOAuthOtpRequired(challengeId: String, email: String?): Map<String, Any?> =
+        mapOf("kind" to "otp_required", "challengeID" to challengeId, "email" to email)
+
     /**
      * Encode a [PreludeJSONValue] as a plain JS-shaped value — the
      * JS-side `extras: Record<string, unknown>` contract has no

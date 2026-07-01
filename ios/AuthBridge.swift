@@ -27,6 +27,7 @@ final class AuthBridge {
     private var clients: [String: PreludeAuthClient] = [:]
     private var pendingResolves: [String: Task<PreludeAuthClient, Error>] = [:]
     private var challenges: [String: [String: StepUpChallenge]] = [:]
+    private var oauthChallenges: [String: [String: OAuthEmailChallenge]] = [:]
 
     /// Single serial queue covers all three maps. Their lifetimes
     /// are coupled — disposing a handle evicts everything in
@@ -114,6 +115,7 @@ final class AuthBridge {
             // `clients` (the post-await write checks for `pending`).
             pendingResolves.removeValue(forKey: handle)
             challenges.removeValue(forKey: handle)
+            oauthChallenges.removeValue(forKey: handle)
         }
     }
 
@@ -125,6 +127,7 @@ final class AuthBridge {
             clients.removeAll()
             pendingResolves.removeAll()
             challenges.removeAll()
+            oauthChallenges.removeAll()
         }
     }
 
@@ -177,6 +180,56 @@ final class AuthBridge {
                 "Step-up challenge `\(challengeID)` not found. " +
                 "Pass the value returned by requestStepUp / submitStepUpOTP " +
                 "unchanged, or call requestStepUp(scope:) again."
+            )
+        }
+        return challenge
+    }
+
+    // MARK: - OAuth-email-link challenge cache
+
+    /// Stash the `OAuthEmailChallenge` returned by an `otpRequired`
+    /// login under a freshly minted opaque id and hand the id back —
+    /// only that crosses to JS, so the verification token it carries
+    /// never leaves the device. A write that races `dispose(handle:)`
+    /// / `clearAll()` silently no-ops.
+    func cacheOAuthChallenge(handle: String, challenge: OAuthEmailChallenge) -> String {
+        let id = UUID().uuidString
+        queue.sync {
+            // Don't resurrect entries for a disposed handle.
+            guard clients[handle] != nil else { return }
+            var slot = oauthChallenges[handle] ?? [:]
+            slot[id] = challenge
+            oauthChallenges[handle] = slot
+        }
+        return id
+    }
+
+    func evictOAuthChallenge(handle: String, challengeID: String) {
+        queue.sync {
+            guard var slot = oauthChallenges[handle] else { return }
+            slot.removeValue(forKey: challengeID)
+            if slot.isEmpty {
+                oauthChallenges.removeValue(forKey: handle)
+            } else {
+                oauthChallenges[handle] = slot
+            }
+        }
+    }
+
+    /// Resolve a JS-side `challengeID` back to its cached challenge, or
+    /// throw ``PreludeAuthError/invalidChallengeToken`` so the consumer
+    /// restarts the OAuth login.
+    func lookupOAuthChallenge(
+        handle: String,
+        challengeID: String
+    ) throws -> OAuthEmailChallenge {
+        var found: OAuthEmailChallenge?
+        queue.sync { found = oauthChallenges[handle]?[challengeID] }
+        guard let challenge = found else {
+            throw PreludeAuthError.invalidChallengeToken(
+                "OAuth email challenge `\(challengeID)` not found. " +
+                "Pass the value returned by finalizeOAuthLogin / loginWithOAuth " +
+                "unchanged, or restart the OAuth login."
             )
         }
         return challenge

@@ -12,7 +12,15 @@ export {
 export { RedactedString } from "./types/redactedString";
 export { PreludeProfile } from "./types/profile";
 export { PreludeUser } from "./types/user";
+export {
+  FinalizeOAuthLoginResult,
+  InitiateOAuthLoginOptions,
+  OAuthEmailChallenge,
+  OAuthLoginOptions,
+  OAuthProvider,
+} from "./types/oauth";
 export { StartOTPLoginOptions } from "./types/otp";
+export { MigrateOptions } from "./types/migrate";
 export {
   LoginWithPasswordOptions,
   PreludePasswordCompliancy,
@@ -30,6 +38,7 @@ export {
 export { StepUpChallenge, StepUpStatus } from "./types/stepUp";
 export {
   BadRequestError,
+  CancelledError,
   ConflictError,
   CryptoFailureError,
   DisposedError,
@@ -48,6 +57,7 @@ export {
   PreludeAuthError,
   RateLimitedError,
   RefreshFailedError,
+  SAMLLoginRequiredError,
   TimeoutError,
   TokenReusedError,
   UnauthorizedError,

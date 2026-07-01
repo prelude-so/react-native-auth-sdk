@@ -4,6 +4,16 @@ import { validatePassword } from "./passwordValidate";
 import { ConfigJson } from "./types/config";
 import { Endpoint } from "./types/endpoint";
 import { DisposedError, fromNativeError } from "./types/errors";
+import { migrateOptionsToJson, MigrateOptions } from "./types/migrate";
+import {
+  FinalizeOAuthLoginResult,
+  finalizeOAuthLoginResultFromJson,
+  InitiateOAuthLoginOptions,
+  initiateOAuthLoginOptionsToJson,
+  OAuthEmailChallenge,
+  OAuthLoginOptions,
+  oAuthLoginOptionsToJson,
+} from "./types/oauth";
 import { startOTPLoginOptionsToJson, StartOTPLoginOptions } from "./types/otp";
 import {
   loginWithPasswordOptionsToJson,
@@ -206,6 +216,103 @@ export class PreludeAuthClient {
    */
   canChangePassword(): Promise<boolean> {
     return this.invoke(() => native.canChangePassword(this.handle, this.config));
+  }
+
+  // ---------- Migration ----------
+
+  /**
+   * Exchange a legacy bearer token for a Prelude session. Safe to
+   * call on every launch: a valid cached session short-circuits
+   * without spending the token, and concurrent callers share a
+   * single in-flight exchange.
+   */
+  async migrate(options: MigrateOptions): Promise<PreludeUser> {
+    const raw = await this.invoke(() =>
+      native.migrate(this.handle, this.config, migrateOptionsToJson(options)),
+    );
+    return userFromJson(raw);
+  }
+
+  // ---------- Social / OAuth login ----------
+
+  /**
+   * Authenticate against an identity provider in a system web session
+   * and establish a session. One-shot: presents the provider page
+   * natively and redeems the callback.
+   *
+   * Only one login can be presented at a time; a concurrent call
+   * throws `ConflictError`. A dismissed page throws `CancelledError`.
+   *
+   * `options.redirectUri` must use the app's custom URL scheme; an
+   * `http`/`https` URI throws `InvalidConfigurationError` before any
+   * network call.
+   */
+  async loginWithOAuth(
+    options: OAuthLoginOptions,
+  ): Promise<FinalizeOAuthLoginResult> {
+    const raw = await this.invoke(() =>
+      native.loginWithOAuth(
+        this.handle,
+        this.config,
+        oAuthLoginOptionsToJson(options),
+      ),
+    );
+    return finalizeOAuthLoginResultFromJson(raw);
+  }
+
+  /**
+   * Request a provider authorization URL (as a string) to present in
+   * a web authentication context yourself.
+   *
+   * Generates a PKCE pair held natively until `finalizeOAuthLogin`
+   * redeems it; a new call supersedes any unredeemed earlier attempt.
+   * Pair with `finalizeOAuthLogin` when the app presents its own web
+   * session instead of `loginWithOAuth`.
+   */
+  initiateOAuthLogin(options: InitiateOAuthLoginOptions): Promise<string> {
+    return this.invoke(() =>
+      native.initiateOAuthLogin(
+        this.handle,
+        this.config,
+        initiateOAuthLoginOptionsToJson(options),
+      ),
+    );
+  }
+
+  /**
+   * Redeem the `challengeToken` delivered to the redirect URI and
+   * establish a session.
+   *
+   * Throws `MissingChallengeTokenError` for an empty token and
+   * `InvalidChallengeTokenError` for a malformed one.
+   */
+  async finalizeOAuthLogin(
+    challengeToken: string,
+  ): Promise<FinalizeOAuthLoginResult> {
+    const raw = await this.invoke(() =>
+      native.finalizeOAuthLogin(this.handle, this.config, challengeToken),
+    );
+    return finalizeOAuthLoginResultFromJson(raw);
+  }
+
+  /**
+   * Submit the email OTP `code` for an OAuth login that returned an
+   * `otpRequired` result, and establish the session.
+   *
+   * Pass the `OAuthEmailChallenge` from that result as `resuming`; it
+   * is produced when the provider's email must be proven before the
+   * login can complete. Throws `InvalidChallengeTokenError` if the
+   * challenge is unknown (e.g. resumed against a different client) —
+   * recover by restarting the OAuth login.
+   */
+  async checkOAuthEmailOTP(
+    code: string,
+    resuming: OAuthEmailChallenge,
+  ): Promise<PreludeUser> {
+    const raw = await this.invoke(() =>
+      native.checkOAuthEmailOTP(this.handle, this.config, resuming.id, code),
+    );
+    return userFromJson(raw);
   }
 
   // ---------- Refresh / logout / invalidate ----------

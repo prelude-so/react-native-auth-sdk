@@ -23,6 +23,9 @@ export interface UseSignInValue {
   verifyOtp: AuthActions["verifyOtp"];
   cancelOtp: AuthActions["cancelOtp"];
   loginWithPassword: AuthActions["loginWithPassword"];
+  migrate: AuthActions["migrate"];
+  loginWithOAuth: AuthActions["loginWithOAuth"];
+  checkOAuthEmailOtp: AuthActions["checkOAuthEmailOtp"];
 }
 
 const SIGN_IN_ACTIONS: ReadonlySet<AsyncAuthAction> = new Set([
@@ -30,6 +33,9 @@ const SIGN_IN_ACTIONS: ReadonlySet<AsyncAuthAction> = new Set([
   "resendOtp",
   "verifyOtp",
   "loginWithPassword",
+  "migrate",
+  "loginWithOAuth",
+  "checkOAuthEmailOtp",
 ]);
 const selectSignInPending = makeScopedPendingSelector(SIGN_IN_ACTIONS);
 
@@ -46,5 +52,8 @@ export function useSignIn(): UseSignInValue {
     verifyOtp: actions.verifyOtp,
     cancelOtp: actions.cancelOtp,
     loginWithPassword: actions.loginWithPassword,
+    migrate: actions.migrate,
+    loginWithOAuth: actions.loginWithOAuth,
+    checkOAuthEmailOtp: actions.checkOAuthEmailOtp,
   };
 }

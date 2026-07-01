@@ -83,6 +83,44 @@ func decodeStartOTPLoginOptions(_ raw: [String: Any]) throws -> StartOTPLoginOpt
     )
 }
 
+/// Resolve a wire provider string to its `OAuthProvider`, matched
+/// case-insensitively against the raw value. An unknown value fails
+/// loudly so a typo can't silently pick the wrong IdP.
+func decodeOAuthProvider(_ raw: Any?) throws -> OAuthProvider {
+    guard let wire = raw as? String,
+          let provider = OAuthProvider.allCases.first(where: {
+              $0.rawValue.caseInsensitiveCompare(wire) == .orderedSame
+          })
+    else {
+        throw decodeError("Unknown OAuthProvider: \(raw ?? "nil")")
+    }
+    return provider
+}
+
+func decodeOAuthLoginOptions(_ raw: [String: Any]) throws -> OAuthLoginOptions {
+    guard let redirect = raw["redirectUri"] as? String,
+          let url = URL(string: redirect)
+    else {
+        throw decodeError("OAuthLoginOptions: malformed payload")
+    }
+    let ephemeral = (raw["prefersEphemeralSession"] as? Bool) ?? false
+    return OAuthLoginOptions(
+        provider: try decodeOAuthProvider(raw["provider"]),
+        redirectURI: url,
+        prefersEphemeralSession: ephemeral
+    )
+}
+
+func decodeInitiateOAuthLoginOptions(_ raw: [String: Any]) throws -> InitiateOAuthLoginOptions {
+    guard let redirect = raw["redirectUri"] as? String else {
+        throw decodeError("InitiateOAuthLoginOptions: malformed payload")
+    }
+    return InitiateOAuthLoginOptions(
+        provider: try decodeOAuthProvider(raw["provider"]),
+        redirectURI: redirect
+    )
+}
+
 func decodeLoginWithPasswordOptions(_ raw: [String: Any]) throws -> LoginWithPasswordOptions {
     guard let email = raw["emailAddress"] as? String,
           let password = raw["password"] as? String
@@ -93,6 +131,13 @@ func decodeLoginWithPasswordOptions(_ raw: [String: Any]) throws -> LoginWithPas
     // internally with `RedactedString` — the change-password bridge
     // wraps explicitly because that init's signature differs.
     return LoginWithPasswordOptions(emailAddress: email, password: password)
+}
+
+func decodeMigrateOptions(_ raw: [String: Any]) throws -> MigrateOptions {
+    guard let token = raw["token"] as? String else {
+        throw decodeError("MigrateOptions: malformed payload")
+    }
+    return MigrateOptions(token: token)
 }
 
 func decodeListSessionsOptions(_ raw: [String: Any]) -> ListSessionsOptions {

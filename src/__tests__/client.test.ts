@@ -14,6 +14,10 @@ const mockNative = {
   // null return; multi-step / non-null cases are mocked per-test.
   submitStepUpOTP: jest.fn().mockResolvedValue(null),
   getActiveStepUp: jest.fn().mockResolvedValue(null),
+  migrate: jest.fn().mockResolvedValue({
+    accessToken: "tok",
+    profile: { extras: {} },
+  }),
 };
 
 jest.mock("expo-modules-core", () => ({
@@ -22,6 +26,7 @@ jest.mock("expo-modules-core", () => ({
 
 import { PreludeAuthClient } from "../client";
 import { DisposedError } from "../types/errors";
+import { RedactedString } from "../types/redactedString";
 
 beforeEach(() => {
   Object.values(mockNative).forEach((fn) => fn.mockClear?.());
@@ -271,5 +276,18 @@ describe("PreludeAuthClient.submitStepUpOTP cache state machine", () => {
     expect(mockNative.submitStepUpOTP).toHaveBeenNthCalledWith(
       2, expect.any(String), expect.any(Object), "c_initial", "111111",
     );
+  });
+});
+
+describe("PreludeAuthClient.migrate", () => {
+  it("forwards the unwrapped token and returns a user", async () => {
+    const c = new PreludeAuthClient();
+    const user = await c.migrate({ token: new RedactedString("legacy_xyz") });
+    expect(mockNative.migrate).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      { token: "legacy_xyz" },
+    );
+    expect(user.accessToken).toBe("tok");
   });
 });
