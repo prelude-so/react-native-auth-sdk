@@ -119,4 +119,32 @@ class CodecTest {
         assertEquals(20, out["limit"])
         assertEquals(0, out["offset"])
     }
+
+    @Test
+    fun `encodeOAuthLoggedIn wraps the user under the logged_in kind`() {
+        val out = Codec.encodeOAuthLoggedIn(
+            PreludeUser(
+                accessToken = "at_xyz",
+                profile = PreludeProfile(userId = "u_1", sessionId = "s_1"),
+            ),
+        )
+        assertEquals("logged_in", out["kind"])
+        @Suppress("UNCHECKED_CAST")
+        val user = out["user"] as Map<String, Any?>
+        assertEquals("at_xyz", user["accessToken"])
+    }
+
+    @Test
+    fun `encodeOAuthOtpRequired carries the opaque challenge id and email`() {
+        val out = Codec.encodeOAuthOtpRequired("oauth-1", "person@example.com")
+        assertEquals("otp_required", out["kind"])
+        assertEquals("oauth-1", out["challengeID"])
+        assertEquals("person@example.com", out["email"])
+    }
+
+    @Test
+    fun `encodeOAuthOtpRequired preserves a null email`() {
+        val out = Codec.encodeOAuthOtpRequired("oauth-1", null)
+        assertNull(out["email"])
+    }
 }

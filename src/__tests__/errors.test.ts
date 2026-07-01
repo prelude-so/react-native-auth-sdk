@@ -1,5 +1,6 @@
 import {
   BadRequestError,
+  CancelledError,
   ConflictError,
   CryptoFailureError,
   DisposedError,
@@ -39,6 +40,7 @@ describe("fromNativeError", () => {
     ["invalid_otp_code", InvalidOTPCodeError],
     ["refresh_failed", RefreshFailedError],
     ["timeout", TimeoutError],
+    ["cancelled", CancelledError],
     ["invalid_configuration", InvalidConfigurationError],
     ["invalid_password", InvalidPasswordError],
     ["insufficient_scope", InsufficientScopeError],

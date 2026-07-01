@@ -66,6 +66,9 @@ export const RefreshFailedError = subclass(
   "RefreshFailedError",
 );
 export const TimeoutError = subclass("timeout", "TimeoutError");
+// Native operation was cancelled before completing (e.g. a login
+// UI dismissed by the user). Not retryable on its own.
+export const CancelledError = subclass("cancelled", "CancelledError");
 export const InvalidConfigurationError = subclass(
   "invalid_configuration",
   "InvalidConfigurationError",
@@ -88,6 +91,34 @@ export const CryptoFailureError = subclass(
   "CryptoFailureError",
 );
 export const NetworkError = subclass("network", "NetworkError");
+// Raised when an OTP or other login method is refused because the
+// identifier's email domain is enforced to authenticate via SAML SSO.
+// The host app should restart the flow via the SAML initiate endpoint.
+export const SAMLLoginRequiredError = subclass(
+  "saml_login_required",
+  "SAMLLoginRequiredError",
+);
+
+// App has no PasskeyConfig set (Relying Party identity is missing).
+// Route the user to a different MFA factor.
+export const PasskeyNotConfiguredError = subclass(
+  "passkey_not_configured",
+  "PasskeyNotConfiguredError",
+);
+
+// Server rejected the attestation from the registration ceremony —
+// bad challenge, bad origin, or malformed authenticator response.
+export const PasskeyRegistrationFailedError = subclass(
+  "passkey_registration_failed",
+  "PasskeyRegistrationFailedError",
+);
+
+// verify_passkey step cannot be driven — no credentials, assertion
+// failed, or no PasskeyConfig. Fall back to a different step.
+export const PasskeyStepUnavailableError = subclass(
+  "passkey_step_unavailable",
+  "PasskeyStepUnavailableError",
+);
 
 /**
  * Thrown when a method is called on a disposed `PreludeAuthClient`.
@@ -120,11 +151,16 @@ const REGISTRY: Record<string, new (m: string) => PreludeAuthError> = {
   invalid_otp_code: InvalidOTPCodeError,
   refresh_failed: RefreshFailedError,
   timeout: TimeoutError,
+  cancelled: CancelledError,
   invalid_configuration: InvalidConfigurationError,
   invalid_password: InvalidPasswordError,
   insufficient_scope: InsufficientScopeError,
   crypto_failure: CryptoFailureError,
   network: NetworkError,
+  saml_login_required: SAMLLoginRequiredError,
+  passkey_not_configured: PasskeyNotConfiguredError,
+  passkey_registration_failed: PasskeyRegistrationFailedError,
+  passkey_step_unavailable: PasskeyStepUnavailableError,
 };
 
 /**

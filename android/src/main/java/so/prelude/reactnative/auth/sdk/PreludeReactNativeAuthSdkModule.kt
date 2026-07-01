@@ -24,22 +24,28 @@ import expo.modules.kotlin.modules.ModuleDefinition
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import so.prelude.android.auth.FinalizeOAuthLoginResult
 import so.prelude.android.auth.PreludeAuthClient
 import so.prelude.android.auth.PreludeAuthError
 import so.prelude.android.auth.PreludeStepUpStatus
 import so.prelude.android.auth.RedactedString
 import so.prelude.android.auth.changePassword
 import so.prelude.android.auth.canChangePassword
+import so.prelude.android.auth.checkOAuthEmailOTP
 import so.prelude.android.auth.checkOTP
+import so.prelude.android.auth.finalizeOAuthLogin
+import so.prelude.android.auth.initiateOAuthLogin
 import so.prelude.android.auth.getPasswordCompliancy
 import so.prelude.android.auth.listSessions
 import so.prelude.android.auth.loginWithPassword
+import so.prelude.android.auth.migrate
 import so.prelude.android.auth.logout
 import so.prelude.android.auth.requestStepUp
 import so.prelude.android.auth.resendOTP
 import so.prelude.android.auth.revokeSessions
 import so.prelude.android.auth.sendStepUpOTP
 import so.prelude.android.auth.startOTPLogin
+import so.prelude.android.auth.social.loginWithOAuth
 import so.prelude.android.auth.submitStepUpOTP
 
 class PreludeReactNativeAuthSdkModule : Module() {
@@ -93,6 +99,47 @@ class PreludeReactNativeAuthSdkModule : Module() {
             AsyncFunction("canChangePassword") Coroutine {
                 handle: String, config: Map<String, Any?> ->
                 withClient(handle, config) { it.canChangePassword() }
+            }
+
+            // Migration ---------------------------------------------
+            AsyncFunction("migrate") Coroutine {
+                handle: String, config: Map<String, Any?>, options: Map<String, Any?> ->
+                withClient(handle, config) {
+                    Codec.encodeUser(it.migrate(decodeMigrateOptions(options)))
+                }
+            }
+
+            // Social / OAuth login ----------------------------------
+            // `loginWithOAuth` opens a Custom Tab, so it needs an
+            // Android context; the others are pure network calls.
+            AsyncFunction("loginWithOAuth") Coroutine {
+                handle: String, config: Map<String, Any?>, options: Map<String, Any?> ->
+                val context = appContext.reactContext
+                    ?: throw CodedException("generic", "module detached", null)
+                withClient(handle, config) {
+                    encodeOAuthResult(
+                        handle,
+                        it.loginWithOAuth(context, decodeOAuthLoginOptions(options)),
+                    )
+                }
+            }
+            AsyncFunction("initiateOAuthLogin") Coroutine {
+                handle: String, config: Map<String, Any?>, options: Map<String, Any?> ->
+                withClient(handle, config) {
+                    it.initiateOAuthLogin(decodeInitiateOAuthLoginOptions(options)).toString()
+                }
+            }
+            AsyncFunction("finalizeOAuthLogin") Coroutine {
+                handle: String, config: Map<String, Any?>, challengeToken: String ->
+                withClient(handle, config) {
+                    encodeOAuthResult(handle, it.finalizeOAuthLogin(challengeToken))
+                }
+            }
+            AsyncFunction("checkOAuthEmailOTP") Coroutine {
+                handle: String, config: Map<String, Any?>, id: String, code: String ->
+                withClient(handle, config) { client ->
+                    handleCheckOAuthEmailOTP(handle, client, id, code)
+                }
             }
 
             // Refresh / logout / invalidate -------------------------
@@ -270,6 +317,53 @@ class PreludeReactNativeAuthSdkModule : Module() {
             // so a stale entry can't outlive the failure.
             if (e !is PreludeAuthError.InvalidOTPCode) {
                 clientRegistry.evictChallenge(handle, challenge.challengeId)
+            }
+            throw e
+        }
+    }
+
+    /**
+     * Tagged wire encoding of an OAuth outcome. An `otp_required`
+     * result stashes its challenge in the per-handle registry and
+     * crosses only the opaque id, keeping the verification token off
+     * the wire.
+     */
+    private fun encodeOAuthResult(
+        handle: String,
+        result: FinalizeOAuthLoginResult,
+    ): Map<String, Any?> =
+        when (result) {
+            is FinalizeOAuthLoginResult.LoggedIn ->
+                Codec.encodeOAuthLoggedIn(result.user)
+            is FinalizeOAuthLoginResult.OtpRequired -> {
+                val id = clientRegistry.cacheOAuthChallenge(handle, result.challenge)
+                Codec.encodeOAuthOtpRequired(id, result.email)
+            }
+        }
+
+    /**
+     * Redeem the email OTP for an `otp_required` login, resolving the
+     * cached challenge by id. Evicts on success and on any
+     * non-retryable failure — a wrong code keeps the challenge usable
+     * up to the server's bucket limit. Cooperative cancellation is
+     * exempt so the next attempt can resume.
+     */
+    private suspend fun handleCheckOAuthEmailOTP(
+        handle: String,
+        client: PreludeAuthClient,
+        challengeId: String,
+        code: String,
+    ): Map<String, Any?> {
+        val challenge = clientRegistry.lookupOAuthChallenge(handle, challengeId)
+        return try {
+            val user = client.checkOAuthEmailOTP(code, resuming = challenge)
+            clientRegistry.evictOAuthChallenge(handle, challengeId)
+            Codec.encodeUser(user)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            if (e !is PreludeAuthError.InvalidOTPCode) {
+                clientRegistry.evictOAuthChallenge(handle, challengeId)
             }
             throw e
         }

@@ -1,8 +1,13 @@
 import type { PreludeAuthClient } from "../../client";
 import { PreludeIdentifier } from "../../types/identifier";
-import { NoActiveStepUpError, PreludeAuthError } from "../../types/errors";
+import {
+  CancelledError,
+  NoActiveStepUpError,
+  PreludeAuthError,
+} from "../../types/errors";
 import { RedactedString } from "../../types/redactedString";
 import { StepUpChallenge } from "../../types/stepUp";
+import { OAuthEmailChallenge } from "../../types/oauth";
 import { PreludeUser } from "../../types/user";
 import { createAuthActions } from "../actions";
 import { createAuthStore } from "../store";
@@ -26,6 +31,9 @@ function mockClient(overrides: Partial<PreludeAuthClient> = {}): PreludeAuthClie
     resendOTP: mockFn().mockResolvedValue(undefined),
     checkOTP: mockFn().mockResolvedValue(user),
     loginWithPassword: mockFn().mockResolvedValue(user),
+    migrate: mockFn().mockResolvedValue(user),
+    loginWithOAuth: mockFn().mockResolvedValue({ kind: "loggedIn", user }),
+    checkOAuthEmailOTP: mockFn().mockResolvedValue(user),
     refresh: mockFn().mockResolvedValue(user),
     logout: mockFn().mockResolvedValue(undefined),
     requestStepUp: mockFn().mockResolvedValue(challenge),
@@ -94,6 +102,18 @@ describe("createAuthActions", () => {
     expect(arg.emailAddress).toBe("a@b.co");
     expect(arg.password).toBeInstanceOf(RedactedString);
     expect(arg.password.value).toBe("hunter2");
+    expect(store.getSnapshot().stage).toBe("signedIn");
+  });
+
+  test("migrate wraps token in RedactedString and lands signedIn", async () => {
+    const store = createAuthStore();
+    const client = mockClient();
+    const { actions } = createAuthActions(client, store);
+
+    await actions.migrate("legacy_xyz");
+    const arg = (client.migrate as jest.Mock).mock.calls[0][0] as { token: RedactedString };
+    expect(arg.token).toBeInstanceOf(RedactedString);
+    expect(arg.token.value).toBe("legacy_xyz");
     expect(store.getSnapshot().stage).toBe("signedIn");
   });
 
@@ -890,5 +910,152 @@ describe("createAuthActions", () => {
     resolveRefresh(user);
     await refreshing;
     expect(store.getSnapshot().pending.size).toBe(0);
+  });
+});
+
+describe("loginWithOAuth", () => {
+  test("loggedIn result → signedIn + user, resolves with the result", async () => {
+    const store = createAuthStore();
+    const client = mockClient();
+    const { actions } = createAuthActions(client, store);
+
+    const result = await actions.loginWithOAuth({
+      provider: "google",
+      redirectUri: "app://cb",
+    });
+
+    expect(client.loginWithOAuth).toHaveBeenCalledWith({
+      provider: "google",
+      redirectUri: "app://cb",
+    });
+    expect(result).toEqual({ kind: "loggedIn", user });
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedIn");
+    expect(s.user).toBe(user);
+    expect(s.error).toBeNull();
+    expect(s.pending.size).toBe(0);
+  });
+
+  test("otpRequired result → stage untouched, no error, returns result", async () => {
+    const store = createAuthStore();
+    store.setState({ stage: "signedOut" });
+    const otp = {
+      kind: "otpRequired",
+      challenge: new OAuthEmailChallenge("oauth-1"),
+      email: "a@b.co",
+    } as const;
+    const client = mockClient({
+      loginWithOAuth: mockFn().mockResolvedValue(otp),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    const result = await actions.loginWithOAuth({
+      provider: "google",
+      redirectUri: "app://cb",
+    });
+
+    expect(result).toEqual(otp);
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedOut");
+    expect(s.user).toBeNull();
+    expect(s.error).toBeNull();
+  });
+
+  test("cancellation is swallowed: no error, resolves undefined", async () => {
+    const store = createAuthStore();
+    store.setState({ stage: "signedOut" });
+    const client = mockClient({
+      loginWithOAuth: mockFn().mockRejectedValue(new CancelledError("Cancelled")),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    const result = await actions.loginWithOAuth({
+      provider: "google",
+      redirectUri: "app://cb",
+    });
+
+    expect(result).toBeUndefined();
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedOut");
+    expect(s.error).toBeNull();
+  });
+
+  test("non-cancel failures populate state.error", async () => {
+    const store = createAuthStore();
+    const client = mockClient({
+      loginWithOAuth: mockFn().mockRejectedValue(
+        new PreludeAuthError("conflict", "in progress"),
+      ),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    const result = await actions.loginWithOAuth({
+      provider: "google",
+      redirectUri: "app://cb",
+    });
+
+    expect(result).toBeUndefined();
+    expect(store.getSnapshot().error?.code).toBe("conflict");
+  });
+});
+
+describe("checkOAuthEmailOtp", () => {
+  const challenge = new OAuthEmailChallenge("oauth-1");
+
+  test("success → signedIn + user, clears otp metadata", async () => {
+    const store = createAuthStore();
+    store.setState({ stage: "signedOut" });
+    const client = mockClient();
+    const { actions } = createAuthActions(client, store);
+
+    await actions.checkOAuthEmailOtp("123456", challenge);
+
+    expect(client.checkOAuthEmailOTP).toHaveBeenCalledWith("123456", challenge);
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedIn");
+    expect(s.user).toBe(user);
+    expect(s.pendingIdentifier).toBeNull();
+    expect(s.otpSentAt).toBeNull();
+    expect(s.error).toBeNull();
+    expect(s.pending.size).toBe(0);
+  });
+
+  test("failure populates state.error, stage untouched", async () => {
+    const store = createAuthStore();
+    store.setState({ stage: "signedOut" });
+    const client = mockClient({
+      checkOAuthEmailOTP: mockFn().mockRejectedValue(
+        new PreludeAuthError("invalid_otp_code", "bad code"),
+      ),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    await actions.checkOAuthEmailOtp("000000", challenge);
+
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedOut");
+    expect(s.user).toBeNull();
+    expect(s.error?.code).toBe("invalid_otp_code");
+  });
+
+  test("signOut mid check: late completion stays signedOut", async () => {
+    const store = createAuthStore();
+    let resolveCheck!: (u: PreludeUser) => void;
+    const checkPromise = new Promise<PreludeUser>((r) => {
+      resolveCheck = r;
+    });
+    const client = mockClient({
+      checkOAuthEmailOTP: mockFn().mockReturnValue(checkPromise),
+    } as Partial<PreludeAuthClient>);
+    const { actions } = createAuthActions(client, store);
+
+    const checking = actions.checkOAuthEmailOtp("123456", challenge);
+    await actions.signOut();
+    resolveCheck(user);
+    await expect(checking).resolves.toBeUndefined();
+
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedOut");
+    expect(s.user).toBeNull();
   });
 });

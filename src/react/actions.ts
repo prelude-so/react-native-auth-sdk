@@ -1,5 +1,5 @@
 import { PreludeAuthClient } from "../client";
-import { NoActiveStepUpError } from "../types/errors";
+import { CancelledError, NoActiveStepUpError } from "../types/errors";
 import { RedactedString } from "../types/redactedString";
 
 import { AuthActions, AuthRuntime, GatedRestore } from "./actionTypes";
@@ -92,6 +92,60 @@ export function createAuthActions(
         // `awaitingOtp` flow in favor of a password login, and
         // `pendingIdentifier` / `otpSentAt` are contracted to be null
         // outside `awaitingOtp`.
+        store.setState({
+          stage: "signedIn",
+          user,
+          pendingIdentifier: null,
+          otpSentAt: null,
+        });
+      });
+    },
+    async migrate(legacyToken) {
+      await guarded("migrate", [session], async (stale) => {
+        // Re-wrap the plain string so logs at the native bridge
+        // boundary still see `<redacted>`.
+        const user = await client.migrate({
+          token: new RedactedString(legacyToken),
+        });
+        if (stale()) return;
+        // Clear OTP metadata too — the user may have abandoned an
+        // `awaitingOtp` flow in favor of migrating.
+        store.setState({
+          stage: "signedIn",
+          user,
+          pendingIdentifier: null,
+          otpSentAt: null,
+        });
+      });
+    },
+    async loginWithOAuth(options) {
+      return guarded("loginWithOAuth", [session], async (stale) => {
+        // A dismissed page isn't an error — map `CancelledError` to
+        // `undefined` so the gate resolves without writing `state.error`.
+        const result = await client.loginWithOAuth(options).catch((e) => {
+          if (e instanceof CancelledError) return undefined;
+          throw e;
+        });
+        if (result === undefined || stale()) return undefined;
+        if (result.kind === "loggedIn") {
+          store.setState({
+            stage: "signedIn",
+            user: result.user,
+            pendingIdentifier: null,
+            otpSentAt: null,
+          });
+        }
+        // `otpRequired`: provider email still needs verification. Leave
+        // the stage untouched and hand the result back to the caller.
+        return result;
+      });
+    },
+    async checkOAuthEmailOtp(code, challenge) {
+      await guarded("checkOAuthEmailOtp", [session], async (stale) => {
+        const user = await client.checkOAuthEmailOTP(code, challenge);
+        if (stale()) return;
+        // Clear any OTP metadata a prior flow left behind so it
+        // stays null outside `awaitingOtp`.
         store.setState({
           stage: "signedIn",
           user,

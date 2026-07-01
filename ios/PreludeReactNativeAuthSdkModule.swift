@@ -51,6 +51,25 @@ public class PreludeReactNativeAuthSdkModule: Module {
             try await self.wrap { try await self.bridge.canChangePassword(handle: h, configRaw: c) }
         }
 
+        // Migration -------------------------------------------------
+        AsyncFunction("migrate") { (h: String, c: [String: Any], o: [String: Any]) -> [String: Any] in
+            try await self.wrap { try await self.bridge.migrate(handle: h, configRaw: c, options: o) }
+        }
+
+        // Social / OAuth login --------------------------------------
+        AsyncFunction("loginWithOAuth") { (h: String, c: [String: Any], o: [String: Any]) -> [String: Any] in
+            try await self.wrap { try await self.bridge.loginWithOAuth(handle: h, configRaw: c, options: o) }
+        }
+        AsyncFunction("initiateOAuthLogin") { (h: String, c: [String: Any], o: [String: Any]) -> String in
+            try await self.wrap { try await self.bridge.initiateOAuthLogin(handle: h, configRaw: c, options: o) }
+        }
+        AsyncFunction("finalizeOAuthLogin") { (h: String, c: [String: Any], token: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.finalizeOAuthLogin(handle: h, configRaw: c, challengeToken: token) }
+        }
+        AsyncFunction("checkOAuthEmailOTP") { (h: String, c: [String: Any], id: String, code: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.checkOAuthEmailOTP(handle: h, configRaw: c, challengeID: id, code: code) }
+        }
+
         // Refresh / logout / invalidate -----------------------------
         AsyncFunction("refresh") { (h: String, c: [String: Any]) -> [String: Any] in
             try await self.wrap { try await self.bridge.refresh(handle: h, configRaw: c) }
