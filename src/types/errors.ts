@@ -77,6 +77,13 @@ export const InvalidPasswordError = subclass(
   "invalid_password",
   "InvalidPasswordError",
 );
+// Raised by /login/email/password when the user exists but has no
+// password credential stored. Distinct from UnauthorizedError ("wrong
+// password"); recover via a password reset/set flow instead of retrying.
+export const PasswordNotSetError = subclass(
+  "password_not_set",
+  "PasswordNotSetError",
+);
 export const InsufficientScopeError = subclass(
   "insufficient_scope",
   "InsufficientScopeError",
@@ -154,6 +161,7 @@ const REGISTRY: Record<string, new (m: string) => PreludeAuthError> = {
   cancelled: CancelledError,
   invalid_configuration: InvalidConfigurationError,
   invalid_password: InvalidPasswordError,
+  password_not_set: PasswordNotSetError,
   insufficient_scope: InsufficientScopeError,
   crypto_failure: CryptoFailureError,
   network: NetworkError,

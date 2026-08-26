@@ -3,6 +3,7 @@ package so.prelude.reactnative.auth.sdk
 import android.content.Context
 import android.content.pm.PackageManager
 import so.prelude.android.auth.OAuthEmailChallenge
+import so.prelude.android.auth.OAuthLoginContext
 import so.prelude.android.auth.PreludeAuthClient
 import so.prelude.android.auth.PreludeAuthError
 import so.prelude.android.auth.PreludeStepUpChallenge
@@ -40,11 +41,12 @@ internal fun resolveSignalsSDKKey(context: Context, override: String?): String? 
 
 
 /**
- * Per-handle native client cache plus per-handle in-flight step-up
- * challenges. A single lock covers both: their lifetimes are coupled
- * (disposing a handle should evict both in lockstep) and the wire form
- * sent across the bridge relies on the challenge cache to keep the
- * bearer challenge JWT off the JS side.
+ * Per-handle native client cache plus the per-handle in-flight
+ * challenges and pending OAuth login. A single lock covers them all:
+ * their lifetimes are coupled (disposing a handle should evict every
+ * entry in lockstep) and the wire form sent across the bridge relies
+ * on these caches to keep bearer tokens and PKCE verifiers off the
+ * JS side.
  */
 internal class ClientRegistry {
     private val clients: MutableMap<String, PreludeAuthClient> = mutableMapOf()
@@ -52,6 +54,7 @@ internal class ClientRegistry {
         mutableMapOf()
     private val oauthChallenges: MutableMap<String, MutableMap<String, OAuthEmailChallenge>> =
         mutableMapOf()
+    private val oauthContexts: MutableMap<String, OAuthLoginContext> = mutableMapOf()
     private val lock = Any()
 
     /**
@@ -92,6 +95,7 @@ internal class ClientRegistry {
             clients.remove(handle)
             challenges.remove(handle)
             oauthChallenges.remove(handle)
+            oauthContexts.remove(handle)
         }
     }
 
@@ -101,6 +105,7 @@ internal class ClientRegistry {
             clients.clear()
             challenges.clear()
             oauthChallenges.clear()
+            oauthContexts.clear()
         }
     }
 
@@ -188,6 +193,38 @@ internal class ClientRegistry {
             "OAuth email challenge `$challengeId` not found. " +
                 "Pass the value returned by finalizeOAuthLogin / loginWithOAuth " +
                 "unchanged, or restart the OAuth login.",
+        )
+    }
+
+    /**
+     * Hold the [OAuthLoginContext] minted by `initiateOAuthLogin`
+     * until `finalizeOAuthLogin` redeems it, so the PKCE verifier it
+     * carries never crosses the bridge. One slot per handle: a new
+     * initiate supersedes any unredeemed earlier attempt. A write
+     * that races [dispose] / [clear] silently no-ops.
+     */
+    fun cacheOAuthContext(handle: String, context: OAuthLoginContext) {
+        synchronized(lock) {
+            // Don't resurrect entries for a disposed handle.
+            if (clients[handle] == null) return
+            oauthContexts[handle] = context
+        }
+    }
+
+    fun evictOAuthContext(handle: String) {
+        synchronized(lock) { oauthContexts.remove(handle) }
+    }
+
+    /**
+     * Resolve the pending login context. Throws
+     * `InvalidChallengeToken` when no `initiateOAuthLogin` preceded
+     * this call on this handle; recover by restarting the login.
+     */
+    fun lookupOAuthContext(handle: String): OAuthLoginContext {
+        val found = synchronized(lock) { oauthContexts[handle] }
+        return found ?: throw PreludeAuthError.InvalidChallengeToken(
+            "No OAuth login in progress. Call initiateOAuthLogin on " +
+                "this client before finalizeOAuthLogin.",
         )
     }
 }

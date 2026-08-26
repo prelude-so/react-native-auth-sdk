@@ -7,6 +7,21 @@
 import ExpoModulesCore
 import Foundation
 
+/// `Exception(name:description:code:)` leaves `reason` at its
+/// "undefined reason" default, and the message delivered to JS is
+/// built from `reason` — so errors built that way reach JS with
+/// their message dropped. Overriding `reason` keeps it intact.
+private final class BridgeException: Exception {
+    private let message: String
+
+    init(name: String, message: String, code: String) {
+        self.message = message
+        super.init(name: name, description: message, code: code)
+    }
+
+    override var reason: String { message }
+}
+
 func mapBridgeError(_ error: Error) -> Exception {
     // Already an Expo Exception: preserve its code so a typed throw
     // from a nested call still hydrates the right JS error.
@@ -17,11 +32,11 @@ func mapBridgeError(_ error: Error) -> Exception {
         return mapAuthError(e)
     }
     if let e = error as? BridgeDecodeError {
-        return Exception(name: "BadRequest", description: e.message, code: "bad_request")
+        return BridgeException(name: "BadRequest", message: e.message, code: "bad_request")
     }
-    return Exception(
+    return BridgeException(
         name: "Generic",
-        description: String(describing: error),
+        message: String(describing: error),
         code: "generic"
     )
 }
@@ -31,9 +46,9 @@ func mapBridgeError(_ error: Error) -> Exception {
 // hydrate if the native enum gains those cases.
 private func mapAuthError(_ error: PreludeAuthError) -> Exception {
     let (code, message) = codeAndMessage(error)
-    return Exception(
+    return BridgeException(
         name: nameFor(code: code),
-        description: message,
+        message: message,
         code: code
     )
 }
@@ -60,6 +75,9 @@ private func codeAndMessage(_ error: PreludeAuthError) -> (String, String) {
     case .notFound(let m): return ("not_found", m)
     case .conflict(let m): return ("conflict", m)
     case .samlLoginRequired(let m): return ("saml_login_required", m)
+    case .passkeyNotConfigured(let m): return ("passkey_not_configured", m)
+    case .passkeyRegistrationFailed(let m): return ("passkey_registration_failed", m)
+    case .passkeyStepUnavailable(let m): return ("passkey_step_unavailable", m)
     case .network(let underlying): return ("network", underlying.localizedDescription)
     case .generic(let code, let message): return (code, message)
     }

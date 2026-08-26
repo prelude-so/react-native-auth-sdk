@@ -126,13 +126,18 @@ class PreludeReactNativeAuthSdkModule : Module() {
             AsyncFunction("initiateOAuthLogin") Coroutine {
                 handle: String, config: Map<String, Any?>, options: Map<String, Any?> ->
                 withClient(handle, config) {
-                    it.initiateOAuthLogin(decodeInitiateOAuthLoginOptions(options)).toString()
+                    val context = it.initiateOAuthLogin(decodeInitiateOAuthLoginOptions(options))
+                    clientRegistry.cacheOAuthContext(handle, context)
+                    context.authorizationUrl.toString()
                 }
             }
             AsyncFunction("finalizeOAuthLogin") Coroutine {
                 handle: String, config: Map<String, Any?>, challengeToken: String ->
                 withClient(handle, config) {
-                    encodeOAuthResult(handle, it.finalizeOAuthLogin(challengeToken))
+                    val context = clientRegistry.lookupOAuthContext(handle)
+                    val result = it.finalizeOAuthLogin(context, challengeToken)
+                    clientRegistry.evictOAuthContext(handle)
+                    encodeOAuthResult(handle, result)
                 }
             }
             AsyncFunction("checkOAuthEmailOTP") Coroutine {

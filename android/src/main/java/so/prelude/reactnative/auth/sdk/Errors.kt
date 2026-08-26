@@ -86,6 +86,12 @@ private fun mapAuthError(error: PreludeAuthError): CodedException =
             CodedException("saml_login_required", error.message.orEmpty(), error)
         is PreludeAuthError.Conflict ->
             CodedException("conflict", error.message.orEmpty(), error)
+        is PreludeAuthError.PasskeyNotConfigured ->
+            CodedException("passkey_not_configured", error.message.orEmpty(), error)
+        is PreludeAuthError.PasskeyRegistrationFailed ->
+            CodedException("passkey_registration_failed", error.message.orEmpty(), error)
+        is PreludeAuthError.PasskeyStepUnavailable ->
+            CodedException("passkey_step_unavailable", error.message.orEmpty(), error)
         is PreludeAuthError.Network ->
             CodedException("network", causeMessage(error, "Network error"), error)
         is PreludeAuthError.CryptoFailure ->

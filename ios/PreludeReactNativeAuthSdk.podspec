@@ -14,7 +14,7 @@ Pod::Spec.new do |s|
   s.author         = package['author']
   s.homepage       = package['homepage']
   s.platforms      = { :ios => '15.1' }
-  s.swift_version  = '5.9'
+  s.swift_version  = '5.7'
   s.source         = { git: 'https://github.com/prelude-so/react-native-auth-sdk.git', tag: "v#{s.version}" }
   s.static_framework = true
   s.dependency 'ExpoModulesCore'

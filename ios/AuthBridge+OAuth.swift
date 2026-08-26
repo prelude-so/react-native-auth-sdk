@@ -16,17 +16,22 @@ extension AuthBridge {
         handle: String, configRaw: [String: Any], options: [String: Any]
     ) async throws -> String {
         let client = try await resolveClient(handle: handle, configRaw: configRaw)
-        let url = try await client.initiateOAuthLogin(
+        let context = try await client.initiateOAuthLogin(
             decodeInitiateOAuthLoginOptions(options)
         )
-        return url.absoluteString
+        cacheOAuthContext(handle: handle, context: context)
+        return context.authorizationURL.absoluteString
     }
 
     func finalizeOAuthLogin(
         handle: String, configRaw: [String: Any], challengeToken: String
     ) async throws -> [String: Any] {
         let client = try await resolveClient(handle: handle, configRaw: configRaw)
-        let result = try await client.finalizeOAuthLogin(challengeToken: challengeToken)
+        let context = try lookupOAuthContext(handle: handle)
+        let result = try await client.finalizeOAuthLogin(
+            context, challengeToken: challengeToken
+        )
+        evictOAuthContext(handle: handle)
         return encodeOAuthResult(handle: handle, result: result)
     }
 
