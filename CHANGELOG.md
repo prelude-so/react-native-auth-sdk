@@ -4,6 +4,42 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.6.0] - 2026-08-26
+
+### Added
+- Expo config plugin for the Android OAuth redirect. Adding
+  `["@prelude.so/react-native-auth-sdk", { "scheme": "myapp" }]` to
+  `expo.plugins` declares the redirect activity's intent-filter and
+  adds the `androidx.browser` dependency its Custom Tab needs,
+  replacing the hand-written `AndroidManifest.xml` edit (which could
+  fail the manifest merge by re-declaring attributes the native SDK
+  already sets). iOS needs no configuration.
+- `PasswordNotSetError` (`password_not_set`), raised by password
+  login when the account exists but has no password credential
+  stored. Distinct from `UnauthorizedError` ("wrong password");
+  recover via a password set/reset flow instead of retrying.
+
+### Fixed
+- The bridge now matches their context-based API — `initiateOAuthLogin` keeps
+  the minted login context (and its PKCE verifier) on the native
+  side, and `finalizeOAuthLogin` redeems it. One pending context per
+  client: a new initiate supersedes an unredeemed earlier attempt,
+  and concurrent logins never share a verifier.
+- iOS errors reached JS as `undefined reason`, dropping the
+  message that explains the failure (the typed error code was
+  unaffected). Native error messages now come through intact.
+
+### Changed
+- Development toolchain bumped to Expo SDK 53 / React Native 0.79 /
+  React 19 (dev-time only; the supported consumer range is
+  unchanged: Expo ≥52, React Native ≥0.74, React ≥18.2).
+
+### Native dependencies
+- iOS `PreludeAuth` `0.6.0`
+- Android `so.prelude.android:auth-sdk:0.6.0`
+- Android `so.prelude.android:sdk:0.5.2` (signals)
+- Android `androidx.browser:browser:1.8.0` (added by the config plugin)
+
 ## [0.5.0] - 2026-07-01
 
 ### Added

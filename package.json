@@ -1,7 +1,7 @@
 {
   "name": "@prelude.so/react-native-auth-sdk",
-  "version": "0.5.0",
-  "description": "Prelude Auth SDK for React Native — OTP login, password login, refresh, step-up, and signed sessions on iOS and Android.",
+  "version": "0.6.0",
+  "description": "Prelude Auth SDK for React Native \u2014 OTP login, password login, refresh, step-up, and signed sessions on iOS and Android.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "exports": {
@@ -13,6 +13,7 @@
       "types": "./build/react/index.d.ts",
       "default": "./build/react/index.js"
     },
+    "./app.plugin.js": "./app.plugin.js",
     "./package.json": "./package.json"
   },
   "typesVersions": {
@@ -43,6 +44,7 @@
   "files": [
     "CHANGELOG.md",
     "LICENSE",
+    "app.plugin.js",
     "android/build.gradle",
     "android/src/main/",
     "build/",
@@ -71,11 +73,13 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@types/react": "^18.3.0",
-    "expo": "~52.0.46",
-    "expo-module-scripts": "^4.0.2",
-    "react": "^18.3.0",
-    "react-native": "0.76.9"
+    "@types/react": "^19.0.0",
+    "expo": "~53.0.27",
+    "expo-module-scripts": "^4.1.10",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-native": "0.79.6",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "expo": ">=52.0.0",
@@ -85,7 +89,8 @@
   "so_prelude": {
     "apple_auth_sdk_tag": "0.6.0",
     "android_auth_sdk_version": "0.6.0",
-    "android_signals_sdk_version": "0.5.2"
+    "android_signals_sdk_version": "0.5.2",
+    "android_browser_version": "1.8.0"
   },
   "jest": {
     "preset": "expo-module-scripts"

@@ -28,9 +28,10 @@ final class AuthBridge {
     private var pendingResolves: [String: Task<PreludeAuthClient, Error>] = [:]
     private var challenges: [String: [String: StepUpChallenge]] = [:]
     private var oauthChallenges: [String: [String: OAuthEmailChallenge]] = [:]
+    private var oauthContexts: [String: OAuthLoginContext] = [:]
 
-    /// Single serial queue covers all three maps. Their lifetimes
-    /// are coupled — disposing a handle evicts everything in
+    /// Single serial queue covers every map. Their lifetimes are
+    /// coupled — disposing a handle evicts everything in
     /// lockstep — so a shared queue keeps that invariant cheap to
     /// express. Held only for dictionary reads / writes; the
     /// expensive provisioning work runs outside.
@@ -116,6 +117,7 @@ final class AuthBridge {
             pendingResolves.removeValue(forKey: handle)
             challenges.removeValue(forKey: handle)
             oauthChallenges.removeValue(forKey: handle)
+            oauthContexts.removeValue(forKey: handle)
         }
     }
 
@@ -128,6 +130,7 @@ final class AuthBridge {
             pendingResolves.removeAll()
             challenges.removeAll()
             oauthChallenges.removeAll()
+            oauthContexts.removeAll()
         }
     }
 
@@ -233,5 +236,40 @@ final class AuthBridge {
             )
         }
         return challenge
+    }
+
+    // MARK: - Pending OAuth login context
+
+    /// Hold the ``OAuthLoginContext`` minted by
+    /// ``initiateOAuthLogin`` until ``finalizeOAuthLogin`` redeems
+    /// it, so the PKCE verifier it carries never crosses the bridge.
+    /// One slot per handle: a new initiate supersedes any unredeemed
+    /// earlier attempt. A write that races `dispose(handle:)` /
+    /// `clearAll()` silently no-ops.
+    func cacheOAuthContext(handle: String, context: OAuthLoginContext) {
+        queue.sync {
+            // Don't resurrect entries for a disposed handle.
+            guard clients[handle] != nil else { return }
+            oauthContexts[handle] = context
+        }
+    }
+
+    func evictOAuthContext(handle: String) {
+        queue.sync { oauthContexts.removeValue(forKey: handle) }
+    }
+
+    /// Resolve the pending login context, or throw
+    /// ``PreludeAuthError/invalidChallengeToken`` when no
+    /// ``initiateOAuthLogin`` preceded this call on this handle.
+    func lookupOAuthContext(handle: String) throws -> OAuthLoginContext {
+        var found: OAuthLoginContext?
+        queue.sync { found = oauthContexts[handle] }
+        guard let context = found else {
+            throw PreludeAuthError.invalidChallengeToken(
+                "No OAuth login in progress. Call initiateOAuthLogin on " +
+                "this client before finalizeOAuthLogin."
+            )
+        }
+        return context
     }
 }
