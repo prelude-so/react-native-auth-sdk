@@ -1,6 +1,6 @@
 {
   "name": "@prelude.so/react-native-auth-sdk",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Prelude Auth SDK for React Native \u2014 OTP, password, social, and passkey login, refresh, step-up, and signed sessions on iOS and Android.",
   "main": "build/index.js",
   "types": "build/index.d.ts",

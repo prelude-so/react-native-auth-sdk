@@ -4,6 +4,16 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-10-14
+
+### Fixed
+- iOS build of 0.7.0 failed in every app: the bridge referenced
+  `PreludeAuthError` cases that exist in the PreludeAuth repository
+  but not in the pinned `0.7.0` release ("type '_ErrorCodeProtocol'
+  has no member 'sessionLocked'"). The bridge now compiles against the
+  pinned release; native cases it does not know surface as
+  `PreludeAuthError` with code `generic`.
+
 ## [0.7.0] - 2026-10-14
 
 ### Fixed

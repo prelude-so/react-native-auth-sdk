@@ -38,14 +38,14 @@ fi
 cd "$APP_DIR"
 
 echo "== install the SDK =="
-# The postinstall vendors the PreludeAuth Swift sources: use the in-repo
-# checkout so the build covers the bridge and the native SDK as they are
-# on this branch, not a tagged release.
+# The postinstall vendors the PreludeAuth sources from the tag pinned in
+# package.json, exactly as a customer install does. The in-repo Apple
+# checkout can be ahead of that tag, so building against it would hide
+# a bridge that no longer compiles for customers (0.7.0 shipped that way).
 # `--legacy-peer-deps`: a pre-release Expo template pins a React Native
 # release candidate, which npm does not accept against the SDK's
 # `react-native >=0.74.0` peer range.
-APPLE_AUTH_SDK_LOCATION="$PKG_DIR/../../../apple/PreludeAuth" \
-  npm install --legacy-peer-deps "$TARBALL"
+npm install --legacy-peer-deps "$TARBALL"
 
 echo "== configure the app =="
 node - <<'JS'
