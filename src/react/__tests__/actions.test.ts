@@ -2,12 +2,15 @@ import type { PreludeAuthClient } from "../../client";
 import { PreludeIdentifier } from "../../types/identifier";
 import {
   CancelledError,
+  NetworkError,
   NoActiveStepUpError,
   PreludeAuthError,
+  UnauthorizedError,
 } from "../../types/errors";
 import { RedactedString } from "../../types/redactedString";
 import { StepUpChallenge } from "../../types/stepUp";
 import { OAuthEmailChallenge } from "../../types/oauth";
+import { PasskeyRegistrationResult } from "../../types/passkey";
 import { PreludeUser } from "../../types/user";
 import { createAuthActions } from "../actions";
 import { createAuthStore } from "../store";
@@ -19,6 +22,17 @@ const challenge: StepUpChallenge = {
   challengeID: "c1",
   currentStep: "verify_email",
   requestedScope: "prld:pwd:write",
+};
+const registration: PasskeyRegistrationResult = {
+  credential: {
+    credentialID: "cred_1",
+    nickname: "iPhone",
+    transports: ["internal"],
+    backupState: true,
+    createdAt: new Date(0),
+    lastUsedAt: new Date(0),
+  },
+  alreadyRegistered: false,
 };
 
 // `mockFn()` is typed as `Mock<never, never[]>` by @types/jest, which
@@ -40,6 +54,9 @@ function mockClient(overrides: Partial<PreludeAuthClient> = {}): PreludeAuthClie
     sendStepUpOTP: mockFn().mockResolvedValue(undefined),
     submitStepUpOTP: mockFn().mockResolvedValue(null),
     changePassword: mockFn().mockResolvedValue(undefined),
+    loginWithPasskey: mockFn().mockResolvedValue(user),
+    registerPasskey: mockFn().mockResolvedValue(registration),
+    continueStepUpWithPasskey: mockFn().mockResolvedValue(null),
     ...overrides,
   } as unknown as PreludeAuthClient;
 }
@@ -65,6 +82,68 @@ describe("createAuthActions", () => {
     expect(s.otpSentAt).not.toBeNull();
     expect(s.otpSentAt!).toBeGreaterThanOrEqual(before);
     expect(s.pending.size).toBe(0);
+  });
+
+  test("refresh on a dead session → signedOut with the error kept", async () => {
+    const store = createAuthStore();
+    const error = new UnauthorizedError("session revoked");
+    const client = mockClient({ refresh: mockFn().mockRejectedValue(error) });
+    const { actions } = createAuthActions(client, store);
+    // A signed-in user mid re-auth OTP: every session field must clear.
+    store.setState({
+      stage: "awaitingOtp",
+      user,
+      pendingIdentifier: identifier,
+      otpSentAt: Date.now(),
+      stepUp: challenge,
+    });
+
+    await actions.refresh();
+
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedOut");
+    expect(s.user).toBeNull();
+    expect(s.pendingIdentifier).toBeNull();
+    expect(s.otpSentAt).toBeNull();
+    expect(s.stepUp).toBeNull();
+    expect(s.error).toBe(error);
+  });
+
+  test("refresh on a dead session does not clobber a login that landed meanwhile", async () => {
+    const store = createAuthStore();
+    let reject!: (e: unknown) => void;
+    const refreshPromise = new Promise<PreludeUser>((_, r) => {
+      reject = r;
+    });
+    const client = mockClient({ refresh: mockFn().mockReturnValue(refreshPromise) });
+    const { actions } = createAuthActions(client, store);
+    store.setState({ stage: "signedOut" });
+
+    const refreshing = actions.refresh();
+    await actions.loginWithPassword("a@b.co", "pw");
+    expect(store.getSnapshot().stage).toBe("signedIn");
+
+    reject(new UnauthorizedError("no refresh token"));
+    await refreshing;
+
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedIn");
+    expect(s.user).toBe(user);
+  });
+
+  test("refresh on a transient failure keeps the session", async () => {
+    const store = createAuthStore();
+    const error = new NetworkError("offline");
+    const client = mockClient({ refresh: mockFn().mockRejectedValue(error) });
+    const { actions } = createAuthActions(client, store);
+    store.setState({ stage: "signedIn", user });
+
+    await actions.refresh();
+
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedIn");
+    expect(s.user).toBe(user);
+    expect(s.error).toBe(error);
   });
 
   test("resendOtp refreshes otpSentAt only", async () => {
@@ -1057,5 +1136,142 @@ describe("checkOAuthEmailOtp", () => {
     const s = store.getSnapshot();
     expect(s.stage).toBe("signedOut");
     expect(s.user).toBeNull();
+  });
+});
+
+describe("passkeys", () => {
+  test("loginWithPasskey → signedIn + user, OTP metadata cleared", async () => {
+    const store = createAuthStore();
+    store.setState({ stage: "awaitingOtp", pendingIdentifier: identifier, otpSentAt: 1 });
+    const client = mockClient();
+    const { actions } = createAuthActions(client, store);
+
+    await actions.loginWithPasskey({ autofill: true });
+
+    expect(client.loginWithPasskey).toHaveBeenCalledWith({ autofill: true });
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedIn");
+    expect(s.user).toBe(user);
+    expect(s.pendingIdentifier).toBeNull();
+    expect(s.otpSentAt).toBeNull();
+  });
+
+  test("loginWithPasskey: a dismissed sheet leaves stage and error untouched", async () => {
+    const store = createAuthStore();
+    store.setState({ stage: "signedOut" });
+    const client = mockClient({
+      loginWithPasskey: mockFn().mockRejectedValue(new CancelledError("Cancelled")),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    await actions.loginWithPasskey();
+
+    const s = store.getSnapshot();
+    expect(s.stage).toBe("signedOut");
+    expect(s.error).toBeNull();
+  });
+
+  test("loginWithPasskey: other failures populate state.error", async () => {
+    const store = createAuthStore();
+    const client = mockClient({
+      loginWithPasskey: mockFn().mockRejectedValue(
+        new PreludeAuthError("passkey_not_supported", "iOS 16+"),
+      ),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    await actions.loginWithPasskey();
+
+    expect(store.getSnapshot().error?.code).toBe("passkey_not_supported");
+  });
+
+  test("registerPasskey resolves with the result and forwards options", async () => {
+    const store = createAuthStore();
+    const client = mockClient();
+    const { actions } = createAuthActions(client, store);
+
+    const result = await actions.registerPasskey({ username: "a@b.co", nickname: "iPhone" });
+
+    expect(client.registerPasskey).toHaveBeenCalledWith({ username: "a@b.co", nickname: "iPhone" });
+    expect(result).toBe(registration);
+    expect(store.getSnapshot().error).toBeNull();
+  });
+
+  test("registerPasskey: cancellation resolves undefined without an error", async () => {
+    const store = createAuthStore();
+    const client = mockClient({
+      registerPasskey: mockFn().mockRejectedValue(new CancelledError("Cancelled")),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    expect(await actions.registerPasskey({ username: "a@b.co" })).toBeUndefined();
+    expect(store.getSnapshot().error).toBeNull();
+  });
+
+  test("continueStepUpWithPasskey without an active challenge → NoActiveStepUpError", async () => {
+    const store = createAuthStore();
+    const client = mockClient();
+    const { actions } = createAuthActions(client, store);
+
+    expect(await actions.continueStepUpWithPasskey()).toBeUndefined();
+    expect(store.getSnapshot().error).toBeInstanceOf(NoActiveStepUpError);
+    expect(client.continueStepUpWithPasskey).not.toHaveBeenCalled();
+  });
+
+  test("continueStepUpWithPasskey completes the flow: stepUp → null", async () => {
+    const store = createAuthStore();
+    store.setState({ stepUp: challenge });
+    const client = mockClient();
+    const { actions } = createAuthActions(client, store);
+
+    expect(await actions.continueStepUpWithPasskey()).toBeNull();
+    expect(client.continueStepUpWithPasskey).toHaveBeenCalledWith(challenge);
+    expect(store.getSnapshot().stepUp).toBeNull();
+  });
+
+  test("continueStepUpWithPasskey stores the next challenge in a multi-step flow", async () => {
+    const next: StepUpChallenge = { ...challenge, challengeID: "c2", currentStep: "verify_email" };
+    const store = createAuthStore();
+    store.setState({ stepUp: challenge });
+    const client = mockClient({
+      continueStepUpWithPasskey: mockFn().mockResolvedValue(next),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    expect(await actions.continueStepUpWithPasskey()).toBe(next);
+    expect(store.getSnapshot().stepUp).toBe(next);
+  });
+
+  test("continueStepUpWithPasskey: a dismissed sheet keeps the challenge for a fallback step", async () => {
+    const store = createAuthStore();
+    store.setState({ stepUp: challenge });
+    const client = mockClient({
+      continueStepUpWithPasskey: mockFn().mockRejectedValue(new CancelledError("Cancelled")),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    expect(await actions.continueStepUpWithPasskey()).toBeUndefined();
+    const s = store.getSnapshot();
+    expect(s.stepUp).toBe(challenge);
+    expect(s.error).toBeNull();
+  });
+
+  test("cancelStepUp mid continueStepUpWithPasskey: late settle does not write stepUp", async () => {
+    const store = createAuthStore();
+    store.setState({ stepUp: challenge });
+    let settle!: (v: StepUpChallenge | null) => void;
+    const client = mockClient({
+      continueStepUpWithPasskey: mockFn().mockImplementation(
+        () => new Promise((r) => (settle = r)),
+      ),
+    });
+    const { actions } = createAuthActions(client, store);
+
+    const p = actions.continueStepUpWithPasskey();
+    actions.cancelStepUp();
+    settle({ ...challenge, challengeID: "c2" });
+
+    expect(await p).toBeUndefined();
+    expect(store.getSnapshot().stepUp).toBeNull();
   });
 });

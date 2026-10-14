@@ -137,3 +137,22 @@ class DecodeMigrateOptionsTest {
         assertFailsWith<DecodeException> { decodeMigrateOptions(emptyMap<String, Any?>()) }
     }
 }
+
+class DecodeRegisterPasskeyOptionsTest {
+    @Test
+    fun `decodes every field and folds JS null optionals to Kotlin null`() {
+        val opts = decodeRegisterPasskeyOptions(
+            mapOf("username" to "a@b.co", "displayName" to null, "nickname" to "Pixel"),
+        )
+        assertEquals("a@b.co", opts.username)
+        assertNull(opts.displayName)
+        assertEquals("Pixel", opts.nickname)
+    }
+
+    @Test
+    fun `missing username fails loudly`() {
+        assertFailsWith<DecodeException> {
+            decodeRegisterPasskeyOptions(mapOf("nickname" to "Pixel"))
+        }
+    }
+}

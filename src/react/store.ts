@@ -42,12 +42,15 @@ export type AsyncAuthAction =
   | "migrate"
   | "loginWithOAuth"
   | "checkOAuthEmailOtp"
+  | "loginWithPasskey"
   | "refresh"
   | "signOut"
   | "changePassword"
+  | "registerPasskey"
   | "requestStepUp"
   | "sendStepUpOtp"
-  | "submitStepUpOtp";
+  | "submitStepUpOtp"
+  | "continueStepUpWithPasskey";
 
 export interface AuthStore {
   subscribe: (listener: () => void) => () => void;

@@ -18,6 +18,7 @@ export interface UseStepUpValue {
   requestStepUp: AuthActions["requestStepUp"];
   sendStepUpOtp: AuthActions["sendStepUpOtp"];
   submitStepUpOtp: AuthActions["submitStepUpOtp"];
+  continueStepUpWithPasskey: AuthActions["continueStepUpWithPasskey"];
   cancelStepUp: AuthActions["cancelStepUp"];
 }
 
@@ -25,6 +26,7 @@ const STEP_UP_ACTIONS: ReadonlySet<AsyncAuthAction> = new Set([
   "requestStepUp",
   "sendStepUpOtp",
   "submitStepUpOtp",
+  "continueStepUpWithPasskey",
 ]);
 const selectStepUpPending = makeScopedPendingSelector(STEP_UP_ACTIONS);
 
@@ -41,6 +43,7 @@ export function useStepUp(): UseStepUpValue {
     requestStepUp: actions.requestStepUp,
     sendStepUpOtp: actions.sendStepUpOtp,
     submitStepUpOtp: actions.submitStepUpOtp,
+    continueStepUpWithPasskey: actions.continueStepUpWithPasskey,
     cancelStepUp: actions.cancelStepUp,
   };
 }

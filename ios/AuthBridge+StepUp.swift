@@ -1,4 +1,4 @@
-// Step-up: request, deliver OTP, submit OTP, and read the most
+// Step-up: request, deliver OTP, submit OTP or a passkey, and read the most
 // recent in-flight challenge. Only the public-surface metadata
 // crosses the bridge; the challenge JWT lives in
 // ``AuthBridge``'s per-handle cache.
@@ -55,51 +55,88 @@ extension AuthBridge {
     ) async throws -> [String: Any]? {
         let client = try await resolveClient(handle: handle, configRaw: configRaw)
         let challenge = try lookupChallenge(handle: handle, challengeID: challengeID)
+        return try await advanceStepUp(
+            handle: handle,
+            challenge: challenge,
+            // `invalidOTPCode` keeps the challenge usable up to the
+            // server's bucket limit; any other error kills it.
+            keepsChallenge: { error in
+                if case .invalidOTPCode = error { return true }
+                return false
+            }
+        ) { try await client.submitStepUpOTP(challenge, code: code) }
+    }
+
+    func continueStepUpWithPasskey(
+        handle: String, configRaw: [String: Any], challengeID: String
+    ) async throws -> [String: Any]? {
+        let client = try await resolveClient(handle: handle, configRaw: configRaw)
+        let challenge = try lookupChallenge(handle: handle, challengeID: challengeID)
+        return try await advanceStepUp(
+            handle: handle,
+            challenge: challenge,
+            // Most passkey failures happen before any request is sent —
+            // a dismissed sheet, no usable credential — and leave the
+            // challenge good for a fallback step. Retire it only when
+            // the error says the token itself is gone.
+            keepsChallenge: { error in
+                switch error {
+                case .invalidChallengeToken, .expiredChallengeToken, .tokenReused:
+                    return false
+                default:
+                    return true
+                }
+            }
+        ) { try await client.continueStepUpWithPasskey(challenge) }
+    }
+
+    /// Run one step-up `step` against `challenge` and reconcile the
+    /// cache with its outcome: swap in the returned challenge, or drop
+    /// the entry once the flow completes. On a typed failure
+    /// `keepsChallenge` decides whether the challenge survives for
+    /// another attempt; an untyped throw always evicts.
+    private func advanceStepUp(
+        handle: String,
+        challenge: StepUpChallenge,
+        keepsChallenge: (PreludeAuthError) -> Bool,
+        step: () async throws -> StepUpChallenge?
+    ) async throws -> [String: Any]? {
+        let next: StepUpChallenge?
         do {
-            let next = try await client.submitStepUpOTP(challenge, code: code)
-            guard let next else {
-                // Flow completed: post-completion refresh has already
-                // minted the scoped access token.
-                evictChallenge(handle: handle, challengeID: challenge.challengeID)
-                return nil
-            }
-            if next.status == .blocked {
-                // Terminal: a blocked challenge carries no token and
-                // is unsubmittable, so don't cache it; just drop the
-                // prior entry and surface the verdict to JS.
-                evictChallenge(handle: handle, challengeID: challenge.challengeID)
-                return Codec.encode(challenge: next)
-            }
-            // Insert before evicting so a concurrent reader observing
-            // under the new id never sees an empty slot during a
-            // multi-step transition.
-            cacheChallenge(handle: handle, challenge: next)
-            if next.challengeID != challenge.challengeID {
-                evictChallenge(handle: handle, challengeID: challenge.challengeID)
-            }
-            return Codec.encode(challenge: next)
+            next = try await step()
         } catch let cancel as CancellationError {
             // Cooperative interrupt — leave the challenge cached so
             // the next attempt can resume against the same handle.
-            // Re-throw the caught instance verbatim rather than
-            // minting a fresh one; preserves any future cancellation
-            // context the runtime attaches.
             throw cancel
         } catch let error as PreludeAuthError {
-            // `invalidOTPCode` keeps the challenge usable up to the
-            // server's bucket limit; any other typed SDK error kills it.
-            if case .invalidOTPCode = error {
-                // keep cached
-            } else {
+            if !keepsChallenge(error) {
                 evictChallenge(handle: handle, challengeID: challenge.challengeID)
             }
             throw error
         } catch {
-            // Catch broadly: an untyped throw (e.g. a misconfigured
-            // store) must still evict the challenge so a stale entry
-            // can't outlive the failure.
             evictChallenge(handle: handle, challengeID: challenge.challengeID)
             throw error
         }
+        guard let next else {
+            // Flow completed: post-completion refresh has already
+            // minted the scoped access token.
+            evictChallenge(handle: handle, challengeID: challenge.challengeID)
+            return nil
+        }
+        if next.status == .blocked {
+            // Terminal: a blocked challenge carries no token and is
+            // unsubmittable, so don't cache it; just drop the prior
+            // entry and surface the verdict to JS.
+            evictChallenge(handle: handle, challengeID: challenge.challengeID)
+            return Codec.encode(challenge: next)
+        }
+        // Insert before evicting so a concurrent reader observing
+        // under the new id never sees an empty slot during a
+        // multi-step transition.
+        cacheChallenge(handle: handle, challenge: next)
+        if next.challengeID != challenge.challengeID {
+            evictChallenge(handle: handle, challengeID: challenge.challengeID)
+        }
+        return Codec.encode(challenge: next)
     }
 }

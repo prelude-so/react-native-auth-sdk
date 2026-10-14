@@ -16,6 +16,16 @@ import {
 } from "./types/oauth";
 import { startOTPLoginOptionsToJson, StartOTPLoginOptions } from "./types/otp";
 import {
+  passkeyCredentialFromJson,
+  PasskeyLoginOptions,
+  passkeyLoginOptionsToJson,
+  passkeyRegistrationResultFromJson,
+  PasskeyRegistrationResult,
+  PreludePasskeyCredential,
+  registerPasskeyOptionsToJson,
+  RegisterPasskeyOptions,
+} from "./types/passkey";
+import {
   loginWithPasswordOptionsToJson,
   LoginWithPasswordOptions,
   passwordCompliancyFromJson,
@@ -477,6 +487,97 @@ export class PreludeAuthClient {
       ),
     );
     return raw == null ? null : stepUpChallengeFromJson(raw);
+  }
+
+  /**
+   * Advance a step-up whose `currentStep` is `verify_passkey` by
+   * asserting an existing passkey. Same next-challenge-or-`null`
+   * contract as `submitStepUpOTP`.
+   *
+   * Throws `PasskeyStepUnavailableError` when the current step isn't
+   * `verify_passkey`, and `CancelledError` when the user dismisses
+   * the system sheet — the challenge stays usable for a fallback step.
+   */
+  async continueStepUpWithPasskey(
+    challenge: StepUpChallenge,
+  ): Promise<StepUpChallenge | null> {
+    const raw = await this.invoke(() =>
+      native.continueStepUpWithPasskey(
+        this.handle,
+        this.config,
+        challenge.challengeID,
+      ),
+    );
+    return raw == null ? null : stepUpChallengeFromJson(raw);
+  }
+
+  // ---------- Passkey ----------
+
+  /**
+   * Sign in with a passkey — no password, no OTP. Unauthenticated;
+   * the authenticator picks the account.
+   *
+   * Throws `CancelledError` when the user dismisses the sheet and
+   * `PasskeyNotSupportedError` when the device can't run a ceremony.
+   */
+  async loginWithPasskey(
+    options: PasskeyLoginOptions = {},
+  ): Promise<PreludeUser> {
+    const raw = await this.invoke(() =>
+      native.loginWithPasskey(
+        this.handle,
+        this.config,
+        passkeyLoginOptionsToJson(options),
+      ),
+    );
+    return userFromJson(raw);
+  }
+
+  /**
+   * Register a passkey for the signed-in user. Requires a session
+   * holding `prld:passkey:write`, granted by a completed step-up; the
+   * grant must be session- or profile-bound.
+   *
+   * Prompts the platform authenticator, then returns the stored
+   * credential. `alreadyRegistered` is `true` when the server already
+   * held it.
+   */
+  async registerPasskey(
+    options: RegisterPasskeyOptions,
+  ): Promise<PasskeyRegistrationResult> {
+    const raw = await this.invoke(() =>
+      native.registerPasskey(
+        this.handle,
+        this.config,
+        registerPasskeyOptionsToJson(options),
+      ),
+    );
+    return passkeyRegistrationResultFromJson(raw);
+  }
+
+  /** Passkeys registered to the signed-in user. Requires `prld:passkey:write`. */
+  async listPasskeys(): Promise<PreludePasskeyCredential[]> {
+    const raw = await this.invoke(() =>
+      native.listPasskeys(this.handle, this.config),
+    );
+    return raw.map(passkeyCredentialFromJson);
+  }
+
+  /** Relabel a passkey; an empty `nickname` clears the label. Requires `prld:passkey:write`. */
+  renamePasskey(credentialID: string, nickname: string): Promise<void> {
+    return this.invoke(() =>
+      native.renamePasskey(this.handle, this.config, credentialID, nickname),
+    );
+  }
+
+  /**
+   * Delete a passkey. Requires `prld:passkey:write`. The session is
+   * refreshed afterwards so its `has_passkey` claim stays accurate.
+   */
+  deletePasskey(credentialID: string): Promise<void> {
+    return this.invoke(() =>
+      native.deletePasskey(this.handle, this.config, credentialID),
+    );
   }
 
   // ---------- Cached readers ----------

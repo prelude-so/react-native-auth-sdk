@@ -8,6 +8,7 @@ import so.prelude.android.auth.PreludeListSessionsOptions
 import so.prelude.android.auth.PreludeRevokeTarget
 import so.prelude.android.auth.PreludeAuthError
 import so.prelude.android.auth.RedactedString
+import so.prelude.android.auth.RegisterPasskeyOptions
 import so.prelude.android.auth.StartOTPLoginOptions
 import so.prelude.android.auth.InitiateOAuthLoginOptions
 import so.prelude.android.auth.OAuthProvider
@@ -94,6 +95,18 @@ internal fun decodeLoginWithPasswordOptions(raw: Any?): LoginWithPasswordOptions
     return LoginWithPasswordOptions(
         identifier = email,
         password = RedactedString(password),
+    )
+}
+
+internal fun decodeRegisterPasskeyOptions(raw: Any?): RegisterPasskeyOptions {
+    val json = raw as? Map<*, *>
+        ?: throw decodeError("RegisterPasskeyOptions: malformed payload")
+    val username = json["username"] as? String
+        ?: throw decodeError("RegisterPasskeyOptions: malformed payload")
+    return RegisterPasskeyOptions(
+        username = username,
+        displayName = json["displayName"] as? String,
+        nickname = json["nickname"] as? String,
     )
 }
 

@@ -5,6 +5,11 @@ import {
   OAuthEmailChallenge,
   OAuthLoginOptions,
 } from "../types/oauth";
+import {
+  PasskeyLoginOptions,
+  PasskeyRegistrationResult,
+  RegisterPasskeyOptions,
+} from "../types/passkey";
 import { StepUpChallenge } from "../types/stepUp";
 
 import { RestoreOutcome } from "./restore";
@@ -21,6 +26,7 @@ import { RestoreOutcome } from "./restore";
  *     `submitStepUpOtp` → `nextChallenge | null | undefined`,
  *     `sendStepUpOtp`   → `true | undefined`,
  *     `changePassword`  → `true | undefined`,
+ *     `registerPasskey` → `result | undefined`,
  *     where `undefined` is the failure / cancel sentinel.
  *
  * Code that needs throw-on-error semantics (sequencing, background
@@ -58,10 +64,25 @@ export interface AuthActions {
     code: string,
     challenge: OAuthEmailChallenge,
   ) => Promise<void>;
+  /**
+   * Passkey login via the platform authenticator. On success
+   * transitions to `signedIn`. A dismissed sheet resolves without
+   * populating `state.error`; any other failure populates it.
+   */
+  loginWithPasskey: (options?: PasskeyLoginOptions) => Promise<void>;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Resolves with `true` on success, `undefined` on failure / cancellation. */
   changePassword: (password: string) => Promise<boolean | undefined>;
+  /**
+   * Register a passkey for the signed-in user; needs a completed
+   * step-up for `prld:passkey:write`. Resolves with the result, or
+   * `undefined` on failure / a dismissed sheet (which leaves
+   * `state.error` untouched).
+   */
+  registerPasskey: (
+    options: RegisterPasskeyOptions,
+  ) => Promise<PasskeyRegistrationResult | undefined>;
   requestStepUp: (
     scope: string | RequestStepUpOptions,
   ) => Promise<StepUpChallenge | undefined>;
@@ -83,6 +104,13 @@ export interface AuthActions {
   submitStepUpOtp: (
     code: string,
   ) => Promise<StepUpChallenge | null | undefined>;
+  /**
+   * Assert a passkey against the active `verify_passkey` step. Same
+   * return contract as `submitStepUpOtp`; a dismissed sheet resolves
+   * with `undefined` and leaves both `state.error` and the active
+   * challenge untouched, so the UI can offer a fallback step.
+   */
+  continueStepUpWithPasskey: () => Promise<StepUpChallenge | null | undefined>;
   cancelStepUp: () => void;
   clearError: () => void;
 }

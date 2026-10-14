@@ -106,8 +106,28 @@ public class PreludeReactNativeAuthSdkModule: Module {
         AsyncFunction("submitStepUpOTP") { (h: String, c: [String: Any], id: String, code: String) -> [String: Any]? in
             try await self.wrap { try await self.bridge.submitStepUpOTP(handle: h, configRaw: c, challengeID: id, code: code) }
         }
+        AsyncFunction("continueStepUpWithPasskey") { (h: String, c: [String: Any], id: String) -> [String: Any]? in
+            try await self.wrap { try await self.bridge.continueStepUpWithPasskey(handle: h, configRaw: c, challengeID: id) }
+        }
         AsyncFunction("getActiveStepUp") { (h: String, c: [String: Any]) -> [String: Any]? in
             try await self.wrap { try await self.bridge.getActiveStepUp(handle: h, configRaw: c) }
+        }
+
+        // Passkey ---------------------------------------------------
+        AsyncFunction("loginWithPasskey") { (h: String, c: [String: Any], o: [String: Any]) -> [String: Any] in
+            try await self.wrap { try await self.bridge.loginWithPasskey(handle: h, configRaw: c, options: o) }
+        }
+        AsyncFunction("registerPasskey") { (h: String, c: [String: Any], o: [String: Any]) -> [String: Any] in
+            try await self.wrap { try await self.bridge.registerPasskey(handle: h, configRaw: c, options: o) }
+        }
+        AsyncFunction("listPasskeys") { (h: String, c: [String: Any]) -> [[String: Any]] in
+            try await self.wrap { try await self.bridge.listPasskeys(handle: h, configRaw: c) }
+        }
+        AsyncFunction("renamePasskey") { (h: String, c: [String: Any], id: String, nickname: String) in
+            try await self.wrap { try await self.bridge.renamePasskey(handle: h, configRaw: c, credentialID: id, nickname: nickname) }
+        }
+        AsyncFunction("deletePasskey") { (h: String, c: [String: Any], id: String) in
+            try await self.wrap { try await self.bridge.deletePasskey(handle: h, configRaw: c, credentialID: id) }
         }
 
         // Cached readers --------------------------------------------

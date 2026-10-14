@@ -11,15 +11,17 @@ import Foundation
 /// "undefined reason" default, and the message delivered to JS is
 /// built from `reason` — so errors built that way reach JS with
 /// their message dropped. Overriding `reason` keeps it intact.
+/// The stored value is not named `message`: `Exception` declares an
+/// overridable `message` since expo-modules-core 58.
 private final class BridgeException: Exception {
-    private let message: String
+    private let bridgeMessage: String
 
     init(name: String, message: String, code: String) {
-        self.message = message
+        bridgeMessage = message
         super.init(name: name, description: message, code: code)
     }
 
-    override var reason: String { message }
+    override var reason: String { bridgeMessage }
 }
 
 func mapBridgeError(_ error: Error) -> Exception {
@@ -66,10 +68,13 @@ private func codeAndMessage(_ error: PreludeAuthError) -> (String, String) {
     case .tokenReused(let m): return ("token_reused", m)
     case .invalidOTPCode(let m): return ("invalid_otp_code", m)
     case .refreshFailed(let m): return ("refresh_failed", m)
+    case .sessionLocked(let m): return ("session_locked", m)
     case .timeout: return ("timeout", "Request timed out")
     case .cancelled: return ("cancelled", "Request cancelled")
     case .invalidConfiguration(let m): return ("invalid_configuration", m)
+    case .noLoginConfig(let m): return ("no_login_config", m)
     case .invalidPassword(let m): return ("invalid_password", m)
+    case .passwordNotSet(let m): return ("password_not_set", m)
     case .forbidden(let m): return ("forbidden", m)
     case .insufficientScope(let m): return ("insufficient_scope", m)
     case .notFound(let m): return ("not_found", m)
@@ -78,6 +83,12 @@ private func codeAndMessage(_ error: PreludeAuthError) -> (String, String) {
     case .passkeyNotConfigured(let m): return ("passkey_not_configured", m)
     case .passkeyRegistrationFailed(let m): return ("passkey_registration_failed", m)
     case .passkeyStepUnavailable(let m): return ("passkey_step_unavailable", m)
+    case .passkeyNotSupported(let m): return ("passkey_not_supported", m)
+    // App-lock cases are not reachable from the bridge yet; they map to
+    // codes so the switch stays exhaustive as the native SDK grows.
+    case .lockUnavailable(let m): return ("lock_unavailable", m)
+    case .invalidPasscode(let m): return ("invalid_passcode", m)
+    case .lockedOut(let m): return ("locked_out", m)
     case .network(let underlying): return ("network", underlying.localizedDescription)
     case .generic(let code, let message): return (code, message)
     }

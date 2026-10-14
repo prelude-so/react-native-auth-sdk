@@ -9,6 +9,12 @@ import {
 } from "./types/oauth";
 import { StartOTPLoginOptionsJson } from "./types/otp";
 import {
+  PasskeyLoginOptionsJson,
+  PasskeyRegistrationResultJson,
+  PreludePasskeyCredentialJson,
+  RegisterPasskeyOptionsJson,
+} from "./types/passkey";
+import {
   LoginWithPasswordOptionsJson,
   PreludePasswordCompliancyJson,
 } from "./types/password";
@@ -132,11 +138,43 @@ export interface PreludeAuthNativeModule {
     challengeID: string,
     code: string,
   ): Promise<StepUpChallengeJson | null>;
+  continueStepUpWithPasskey(
+    handle: string,
+    config: ConfigJson,
+    challengeID: string,
+  ): Promise<StepUpChallengeJson | null>;
   /** Native-cached most recent in-flight challenge, or `null`. */
   getActiveStepUp(
     handle: string,
     config: ConfigJson,
   ): Promise<StepUpChallengeJson | null>;
+
+  // Passkey. The ceremony runs natively; only its outcome crosses.
+  loginWithPasskey(
+    handle: string,
+    config: ConfigJson,
+    options: PasskeyLoginOptionsJson,
+  ): Promise<PreludeUserJson>;
+  registerPasskey(
+    handle: string,
+    config: ConfigJson,
+    options: RegisterPasskeyOptionsJson,
+  ): Promise<PasskeyRegistrationResultJson>;
+  listPasskeys(
+    handle: string,
+    config: ConfigJson,
+  ): Promise<PreludePasskeyCredentialJson[]>;
+  renamePasskey(
+    handle: string,
+    config: ConfigJson,
+    credentialID: string,
+    nickname: string,
+  ): Promise<void>;
+  deletePasskey(
+    handle: string,
+    config: ConfigJson,
+    credentialID: string,
+  ): Promise<void>;
 
   // Cached readers
   getProfile(

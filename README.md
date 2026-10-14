@@ -13,6 +13,11 @@ npm install @prelude.so/react-native-auth-sdk
 # or: yarn add @prelude.so/react-native-auth-sdk
 ```
 
+Each release is listed in the
+[changelog](https://github.com/prelude-so/react-native-auth-sdk/blob/main/CHANGELOG.md)
+and published as a [GitHub release](https://github.com/prelude-so/react-native-auth-sdk/releases)
+you can watch for update notifications.
+
 ### Quickstart
 
 ```ts

@@ -4,6 +4,67 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-10-14
+
+### Fixed
+- iOS build with Expo SDK 58: `expo-modules-core` 58 declares
+  `Exception.message`, which clashed with a stored property of the
+  same name in the bridge's error type ("cannot override with a
+  stored property 'message'").
+
+### Changed
+- `useAuth().refresh` moves `stage` to `signedOut` when the server
+  rejects the session (`UnauthorizedError`, `TokenReusedError`), so
+  the `SignedOut` gate shows the login screen without the app
+  calling `signOut`. Transient failures such as `NetworkError` keep
+  the session and only set `error`.
+
+### Added
+- Passkey login: `loginWithPasskey([options])` signs a user in with
+  the platform authenticator — no password, no OTP. `autofill: true`
+  offers credentials through the keyboard's AutoFill row on iOS.
+- Passkey registration: `registerPasskey(options)` for a session
+  holding `prld:passkey:write`, returning a `PasskeyRegistrationResult`
+  whose `alreadyRegistered` flag marks an idempotent repeat.
+- Passkey management: `listPasskeys()`, `renamePasskey(credentialID,
+  nickname)` and `deletePasskey(credentialID)`, returning
+  `PreludePasskeyCredential` values.
+- `continueStepUpWithPasskey(challenge)` advances a step-up whose
+  `currentStep` is `verify_passkey`, with the same
+  next-challenge-or-`null` contract as `submitStepUpOTP`.
+- Hooks: `useSignIn().loginWithPasskey`, `useAuth().registerPasskey`
+  and `useStepUp().continueStepUpWithPasskey`. A dismissed sheet
+  resolves without populating `error`.
+- Config plugin: `"passkeyDomain"` adds the iOS `webcredentials:`
+  associated domain and, on Android, the Credential Manager
+  dependencies plus the Digital Asset Links `asset_statements`
+  meta-data. `"scheme"` is now optional when `"passkeyDomain"` is set.
+- `PasskeyNotSupportedError` (`passkey_not_supported`) and
+  `PasskeyAlreadyRegisteredError` (`passkey_already_registered`,
+  reported by Android). `PasskeyNotConfiguredError`,
+  `PasskeyRegistrationFailedError`, `PasskeyStepUnavailableError`,
+  `PasswordNotSetError` and `NoLoginConfigError` were already mapped
+  by the bridge but not exported from the package — they are now.
+- `NoLoginConfigError` (`no_login_config`), returned when starting an OTP login
+  while the app has no login configuration accepting the
+  identifier's channel. Create one via the Auth Management API.
+
+### Changed
+- Bumps the iOS dependency to `PreludeAuth` `0.7.0` and the Android
+  dependency to `so.prelude.android:auth-sdk:0.7.1`, the native
+  releases that add passkey support.
+- Android passkey ceremonies need the hosting Activity; calls made
+  while none is attached throw `InvalidConfigurationError`.
+
+### Native dependencies
+- iOS `PreludeAuth` `0.7.0`
+- Android `so.prelude.android:auth-sdk:0.7.1`
+- Android `so.prelude.android:sdk:0.5.2` (signals)
+- Android `androidx.browser:browser:1.8.0` (added by the config plugin)
+- Android `androidx.credentials:credentials:1.5.0` and
+  `credentials-play-services-auth:1.5.0` (added by the config plugin
+  when `passkeyDomain` is set)
+
 ## [0.6.0] - 2026-08-26
 
 ### Added

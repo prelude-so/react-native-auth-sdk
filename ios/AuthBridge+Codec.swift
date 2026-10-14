@@ -95,4 +95,22 @@ enum Codec {
         ]
     }
 
+    /// Timestamps stay unix seconds; JS wraps them in `Date`.
+    static func encode(credential c: PasskeyCredential) -> [String: Any] {
+        [
+            "credentialID": c.credentialID,
+            "nickname": c.nickname ?? NSNull(),
+            "transports": c.transports,
+            "backupState": c.backupState,
+            "createdAt": c.createdAt,
+            "lastUsedAt": c.lastUsedAt,
+        ]
+    }
+
+    static func encode(registration r: PasskeyRegistrationResult) -> [String: Any] {
+        [
+            "credential": encode(credential: r.credential),
+            "alreadyRegistered": r.alreadyRegistered,
+        ]
+    }
 }
