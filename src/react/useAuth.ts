@@ -20,6 +20,7 @@ export interface UseAuthValue {
   refresh: AuthActions["refresh"];
   signOut: AuthActions["signOut"];
   changePassword: AuthActions["changePassword"];
+  registerPasskey: AuthActions["registerPasskey"];
   clearError: AuthActions["clearError"];
   /**
    * Escape hatch to the underlying imperative client. Bypasses the
@@ -34,6 +35,7 @@ const SESSION_ACTIONS: ReadonlySet<AsyncAuthAction> = new Set([
   "refresh",
   "signOut",
   "changePassword",
+  "registerPasskey",
 ]);
 const selectSessionPending = makeScopedPendingSelector(SESSION_ACTIONS);
 
@@ -52,6 +54,7 @@ export function useAuth(): UseAuthValue {
     refresh: actions.refresh,
     signOut: actions.signOut,
     changePassword: actions.changePassword,
+    registerPasskey: actions.registerPasskey,
     clearError: actions.clearError,
     client,
   };

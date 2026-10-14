@@ -4,6 +4,8 @@ import org.junit.Test
 import so.prelude.android.auth.PreludeSessionDeviceType
 import so.prelude.android.auth.PreludeJSONValue
 import so.prelude.android.auth.PreludeListSessionsResponse
+import so.prelude.android.auth.PreludePasskeyCredential
+import so.prelude.android.auth.PreludePasskeyRegistration
 import so.prelude.android.auth.PreludePasswordCompliancy
 import so.prelude.android.auth.PreludeProfile
 import so.prelude.android.auth.PreludeSessionView
@@ -146,5 +148,31 @@ class CodecTest {
     fun `encodeOAuthOtpRequired preserves a null email`() {
         val out = Codec.encodeOAuthOtpRequired("oauth-1", null)
         assertNull(out["email"])
+    }
+
+    @Test
+    fun `encodeRegistration nests the credential and keeps unix-second timestamps`() {
+        val out = Codec.encodeRegistration(
+            PreludePasskeyRegistration(
+                credential = PreludePasskeyCredential(
+                    credentialId = "cred_1",
+                    nickname = null,
+                    transports = listOf("internal"),
+                    backupState = true,
+                    createdAt = 1_700_000_000L,
+                    lastUsedAt = 1_700_000_100L,
+                ),
+                alreadyRegistered = true,
+            ),
+        )
+        assertEquals(true, out["alreadyRegistered"])
+        @Suppress("UNCHECKED_CAST")
+        val credential = out["credential"] as Map<String, Any?>
+        assertEquals("cred_1", credential["credentialID"])
+        assertNull(credential["nickname"])
+        assertEquals(listOf("internal"), credential["transports"])
+        assertEquals(true, credential["backupState"])
+        assertEquals(1_700_000_000L, credential["createdAt"])
+        assertEquals(1_700_000_100L, credential["lastUsedAt"])
     }
 }

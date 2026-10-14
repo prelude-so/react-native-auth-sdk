@@ -74,8 +74,12 @@ private fun mapAuthError(error: PreludeAuthError): CodedException =
             CodedException("cancelled", "Request cancelled", error)
         is PreludeAuthError.InvalidConfiguration ->
             CodedException("invalid_configuration", error.message.orEmpty(), error)
+        is PreludeAuthError.NoLoginConfig ->
+            CodedException("no_login_config", error.message.orEmpty(), error)
         is PreludeAuthError.InvalidPassword ->
             CodedException("invalid_password", error.message.orEmpty(), error)
+        is PreludeAuthError.PasswordNotSet ->
+            CodedException("password_not_set", error.message.orEmpty(), error)
         is PreludeAuthError.Forbidden ->
             CodedException("forbidden", error.message.orEmpty(), error)
         is PreludeAuthError.InsufficientScope ->
@@ -90,8 +94,12 @@ private fun mapAuthError(error: PreludeAuthError): CodedException =
             CodedException("passkey_not_configured", error.message.orEmpty(), error)
         is PreludeAuthError.PasskeyRegistrationFailed ->
             CodedException("passkey_registration_failed", error.message.orEmpty(), error)
+        is PreludeAuthError.PasskeyAlreadyRegistered ->
+            CodedException("passkey_already_registered", error.message.orEmpty(), error)
         is PreludeAuthError.PasskeyStepUnavailable ->
             CodedException("passkey_step_unavailable", error.message.orEmpty(), error)
+        is PreludeAuthError.PasskeyNotSupported ->
+            CodedException("passkey_not_supported", error.message.orEmpty(), error)
         is PreludeAuthError.Network ->
             CodedException("network", causeMessage(error, "Network error"), error)
         is PreludeAuthError.CryptoFailure ->

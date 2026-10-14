@@ -133,6 +133,21 @@ func decodeLoginWithPasswordOptions(_ raw: [String: Any]) throws -> LoginWithPas
     return LoginWithPasswordOptions(emailAddress: email, password: password)
 }
 
+func decodeRegisterPasskeyOptions(_ raw: [String: Any]) throws -> RegisterPasskeyOptions {
+    guard let username = raw["username"] as? String else {
+        throw decodeError("RegisterPasskeyOptions: malformed payload")
+    }
+    return RegisterPasskeyOptions(
+        username: username,
+        displayName: raw["displayName"] as? String,
+        nickname: raw["nickname"] as? String
+    )
+}
+
+func decodePasskeyLoginOptions(_ raw: [String: Any]) -> PasskeyLoginOptions {
+    PasskeyLoginOptions(autofill: (raw["autofill"] as? Bool) ?? false)
+}
+
 func decodeMigrateOptions(_ raw: [String: Any]) throws -> MigrateOptions {
     guard let token = raw["token"] as? String else {
         throw decodeError("MigrateOptions: malformed payload")

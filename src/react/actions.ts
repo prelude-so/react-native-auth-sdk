@@ -1,11 +1,33 @@
 import { PreludeAuthClient } from "../client";
-import { CancelledError, NoActiveStepUpError } from "../types/errors";
+import {
+  CancelledError,
+  NoActiveStepUpError,
+  TokenReusedError,
+  UnauthorizedError,
+} from "../types/errors";
 import { RedactedString } from "../types/redactedString";
+import { StepUpChallenge } from "../types/stepUp";
+import { PreludeUser } from "../types/user";
 
 import { AuthActions, AuthRuntime, GatedRestore } from "./actionTypes";
 import { createGuarded, Gate } from "./gating";
 import { restoreSession } from "./restore";
-import { AuthStore } from "./store";
+import { AsyncAuthAction, AuthStore } from "./store";
+
+/**
+ * A dismissed system sheet or web page isn't an error — map
+ * `CancelledError` to `undefined` so the gate resolves without
+ * writing `state.error`.
+ */
+function swallowCancel(e: unknown): undefined {
+  if (e instanceof CancelledError) return undefined;
+  throw e;
+}
+
+/** The server no longer accepts this session: expired, revoked, or reused. */
+function isSessionGone(e: unknown): boolean {
+  return e instanceof UnauthorizedError || e instanceof TokenReusedError;
+}
 
 /**
  * Gate bumps:
@@ -27,6 +49,28 @@ export function createAuthActions(
   const stepUp: Gate = { gen: 0 };
   const session: Gate = { gen: 0 };
   const { guarded, projectPending } = createGuarded(store);
+
+  // The active challenge is read from `state.stepUp` at call time, so
+  // a concurrent `requestStepUp` can't redirect an in-flight step.
+  const activeChallenge = (): StepUpChallenge => {
+    const challenge = store.getSnapshot().stepUp;
+    if (!challenge) throw new NoActiveStepUpError("No active step-up challenge");
+    return challenge;
+  };
+
+  // Run one step against the active challenge and store what comes
+  // back: the next challenge, `null` when the flow completed, or
+  // `undefined` when the step was abandoned and nothing should change.
+  const advanceStepUp = (
+    name: AsyncAuthAction,
+    step: (challenge: StepUpChallenge) => Promise<StepUpChallenge | null | undefined>,
+  ) =>
+    guarded(name, [stepUp, session], async (stale) => {
+      const next = await step(activeChallenge());
+      if (next === undefined || stale()) return undefined;
+      store.setState({ stepUp: next });
+      return next;
+    });
 
   const actions: AuthActions = {
     async startOtpLogin(identifier, loginConfigID) {
@@ -120,12 +164,7 @@ export function createAuthActions(
     },
     async loginWithOAuth(options) {
       return guarded("loginWithOAuth", [session], async (stale) => {
-        // A dismissed page isn't an error — map `CancelledError` to
-        // `undefined` so the gate resolves without writing `state.error`.
-        const result = await client.loginWithOAuth(options).catch((e) => {
-          if (e instanceof CancelledError) return undefined;
-          throw e;
-        });
+        const result = await client.loginWithOAuth(options).catch(swallowCancel);
         if (result === undefined || stale()) return undefined;
         if (result.kind === "loggedIn") {
           store.setState({
@@ -154,9 +193,41 @@ export function createAuthActions(
         });
       });
     },
+    async loginWithPasskey(options) {
+      await guarded("loginWithPasskey", [session], async (stale) => {
+        const user = await client.loginWithPasskey(options).catch(swallowCancel);
+        if (user === undefined || stale()) return;
+        store.setState({
+          stage: "signedIn",
+          user,
+          pendingIdentifier: null,
+          otpSentAt: null,
+        });
+      });
+    },
     async refresh() {
       await guarded("refresh", [session], async (stale) => {
-        const user = await client.refresh();
+        const refreshed = store.getSnapshot().user;
+        let user: PreludeUser;
+        try {
+          user = await client.refresh();
+        } catch (e) {
+          // A dead session is a terminal state, not a transient error:
+          // move to signedOut so the gates show the login screen. The
+          // error is still recorded by `guarded` for the UI. A login
+          // that landed meanwhile replaced `user`; leave it alone.
+          const unchanged = store.getSnapshot().user === refreshed;
+          if (isSessionGone(e) && !stale() && unchanged) {
+            store.setState({
+              stage: "signedOut",
+              user: null,
+              pendingIdentifier: null,
+              otpSentAt: null,
+              stepUp: null,
+            });
+          }
+          throw e;
+        }
         if (stale()) return;
         store.setState({
           stage: "signedIn",
@@ -213,6 +284,11 @@ export function createAuthActions(
         return true as const;
       });
     },
+    async registerPasskey(options) {
+      return guarded("registerPasskey", [session], async () =>
+        client.registerPasskey(options).catch(swallowCancel),
+      );
+    },
     async requestStepUp(scope) {
       const options = typeof scope === "string" ? { scope } : scope;
       return guarded("requestStepUp", [stepUp, session], async (stale) => {
@@ -224,25 +300,19 @@ export function createAuthActions(
     },
     async sendStepUpOtp() {
       return guarded("sendStepUpOtp", [stepUp, session], async () => {
-        const challenge = store.getSnapshot().stepUp;
-        if (!challenge) {
-          throw new NoActiveStepUpError("No active step-up challenge");
-        }
-        await client.sendStepUpOTP(challenge);
+        await client.sendStepUpOTP(activeChallenge());
         return true as const;
       });
     },
     async submitStepUpOtp(code) {
-      return guarded("submitStepUpOtp", [stepUp, session], async (stale) => {
-        const challenge = store.getSnapshot().stepUp;
-        if (!challenge) {
-          throw new NoActiveStepUpError("No active step-up challenge");
-        }
-        const next = await client.submitStepUpOTP(challenge, code);
-        if (stale()) return undefined;
-        store.setState({ stepUp: next });
-        return next;
-      });
+      return advanceStepUp("submitStepUpOtp", (challenge) =>
+        client.submitStepUpOTP(challenge, code),
+      );
+    },
+    async continueStepUpWithPasskey() {
+      return advanceStepUp("continueStepUpWithPasskey", (challenge) =>
+        client.continueStepUpWithPasskey(challenge).catch(swallowCancel),
+      );
     },
     cancelStepUp() {
       // Mirror cancelOtp — clearing the lingering error too keeps

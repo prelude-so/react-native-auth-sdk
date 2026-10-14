@@ -16,6 +16,7 @@
 
 package so.prelude.reactnative.auth.sdk
 
+import android.app.Activity
 import android.content.Context
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
@@ -27,19 +28,26 @@ import kotlinx.coroutines.withContext
 import so.prelude.android.auth.FinalizeOAuthLoginResult
 import so.prelude.android.auth.PreludeAuthClient
 import so.prelude.android.auth.PreludeAuthError
+import so.prelude.android.auth.PreludeStepUpChallenge
 import so.prelude.android.auth.PreludeStepUpStatus
 import so.prelude.android.auth.RedactedString
 import so.prelude.android.auth.changePassword
 import so.prelude.android.auth.canChangePassword
 import so.prelude.android.auth.checkOAuthEmailOTP
 import so.prelude.android.auth.checkOTP
+import so.prelude.android.auth.continueStepUpWithPasskey
+import so.prelude.android.auth.deletePasskey
 import so.prelude.android.auth.finalizeOAuthLogin
 import so.prelude.android.auth.initiateOAuthLogin
 import so.prelude.android.auth.getPasswordCompliancy
+import so.prelude.android.auth.listPasskeys
 import so.prelude.android.auth.listSessions
+import so.prelude.android.auth.loginWithPasskey
 import so.prelude.android.auth.loginWithPassword
 import so.prelude.android.auth.migrate
 import so.prelude.android.auth.logout
+import so.prelude.android.auth.registerPasskey
+import so.prelude.android.auth.renamePasskey
 import so.prelude.android.auth.requestStepUp
 import so.prelude.android.auth.resendOTP
 import so.prelude.android.auth.revokeSessions
@@ -198,6 +206,12 @@ class PreludeReactNativeAuthSdkModule : Module() {
                     handleSubmitStepUpOTP(handle, client, id, code)
                 }
             }
+            AsyncFunction("continueStepUpWithPasskey") Coroutine {
+                handle: String, config: Map<String, Any?>, id: String ->
+                withClient(handle, config) { client ->
+                    handleContinueStepUpWithPasskey(handle, client, id)
+                }
+            }
             AsyncFunction("getActiveStepUp") Coroutine {
                 handle: String, config: Map<String, Any?> ->
                 withClient(handle, config) { client ->
@@ -210,6 +224,43 @@ class PreludeReactNativeAuthSdkModule : Module() {
                         Codec.encodeChallenge(it)
                     }
                 }
+            }
+
+            // Passkey -----------------------------------------------
+            // Ceremonies present a system sheet, so they need the
+            // hosting Activity rather than the application context.
+            // Login options carry nothing for this platform: the
+            // Credential Manager sheet is the only presentation mode.
+            AsyncFunction("loginWithPasskey") Coroutine {
+                handle: String, config: Map<String, Any?>, options: Map<String, Any?> ->
+                withClient(handle, config) {
+                    Codec.encodeUser(it.loginWithPasskey(requireActivity("loginWithPasskey")))
+                }
+            }
+            AsyncFunction("registerPasskey") Coroutine {
+                handle: String, config: Map<String, Any?>, options: Map<String, Any?> ->
+                withClient(handle, config) {
+                    Codec.encodeRegistration(
+                        it.registerPasskey(
+                            requireActivity("registerPasskey"),
+                            decodeRegisterPasskeyOptions(options),
+                        ),
+                    )
+                }
+            }
+            AsyncFunction("listPasskeys") Coroutine {
+                handle: String, config: Map<String, Any?> ->
+                withClient(handle, config) { client ->
+                    client.listPasskeys().map { Codec.encodeCredential(it) }
+                }
+            }
+            AsyncFunction("renamePasskey") Coroutine {
+                handle: String, config: Map<String, Any?>, id: String, nickname: String ->
+                withClient(handle, config) { it.renamePasskey(id, nickname) }
+            }
+            AsyncFunction("deletePasskey") Coroutine {
+                handle: String, config: Map<String, Any?>, id: String ->
+                withClient(handle, config) { it.deletePasskey(id) }
             }
 
             // Cached readers ----------------------------------------
@@ -270,13 +321,24 @@ class PreludeReactNativeAuthSdkModule : Module() {
     }
 
     /**
-     * Submit an OTP against an in-flight step-up challenge. Resolves
-     * the cached challenge by ID, runs the SDK call, and either caches
-     * the next step (multi-step flow) or evicts on completion. On
-     * `InvalidOTPCode` the challenge stays usable up to the server's
-     * bucket limit; any other failure (SDK error or unexpected
-     * runtime throw) kills it. Cooperative cancellation is exempt —
-     * the challenge stays valid for the next attempt.
+     * The Activity currently hosting the React root. Read at call time
+     * rather than at module init so a call that overlaps a
+     * configuration change sees the live Activity, not a finished one.
+     */
+    private fun requireActivity(method: String): Activity {
+        val activity = appContext.currentActivity
+        if (activity == null || activity.isFinishing || activity.isDestroyed) {
+            throw PreludeAuthError.InvalidConfiguration(
+                "$method needs a foreground Activity; none is attached.",
+            )
+        }
+        return activity
+    }
+
+    /**
+     * Submit an OTP against an in-flight step-up challenge. A wrong
+     * code keeps the challenge usable up to the server's bucket
+     * limit; any other error kills it.
      */
     private suspend fun handleSubmitStepUpOTP(
         handle: String,
@@ -285,45 +347,86 @@ class PreludeReactNativeAuthSdkModule : Module() {
         code: String,
     ): Map<String, Any?>? {
         val challenge = clientRegistry.lookupChallenge(handle, challengeId)
-        return try {
-            val next = client.submitStepUpOTP(challenge, code)
-            when {
-                next == null -> {
-                    // Flow completed: post-completion refresh has already
-                    // minted the scoped access token.
-                    clientRegistry.evictChallenge(handle, challenge.challengeId)
-                    null
-                }
-                next.status == PreludeStepUpStatus.BLOCKED -> {
-                    // Terminal: a blocked challenge carries no token and
-                    // is unsubmittable, so don't cache it; just drop the
-                    // prior entry and surface the verdict to JS.
-                    clientRegistry.evictChallenge(handle, challenge.challengeId)
-                    Codec.encodeChallenge(next)
-                }
-                else -> {
-                    // Insert before evicting so a concurrent reader observing
-                    // under the new ID never sees an empty slot during a
-                    // multi-step transition.
-                    clientRegistry.cacheChallenge(handle, next)
-                    if (next.challengeId != challenge.challengeId) {
-                        clientRegistry.evictChallenge(handle, challenge.challengeId)
-                    }
-                    Codec.encodeChallenge(next)
-                }
-            }
+        return advanceStepUp(
+            handle,
+            challenge,
+            keepsChallenge = { it is PreludeAuthError.InvalidOTPCode },
+        ) { client.submitStepUpOTP(challenge, code) }
+    }
+
+    /**
+     * Assert a passkey against an in-flight `verify_passkey` step.
+     * Most passkey failures happen before any request is sent — a
+     * dismissed sheet, no usable credential — and leave the challenge
+     * good for a fallback step, so it is retired only when the error
+     * says the token itself is gone.
+     */
+    private suspend fun handleContinueStepUpWithPasskey(
+        handle: String,
+        client: PreludeAuthClient,
+        challengeId: String,
+    ): Map<String, Any?>? {
+        val activity = requireActivity("continueStepUpWithPasskey")
+        val challenge = clientRegistry.lookupChallenge(handle, challengeId)
+        return advanceStepUp(
+            handle,
+            challenge,
+            keepsChallenge = {
+                it !is PreludeAuthError.InvalidChallengeToken &&
+                    it !is PreludeAuthError.ExpiredChallengeToken &&
+                    it !is PreludeAuthError.TokenReused
+            },
+        ) { client.continueStepUpWithPasskey(activity, challenge) }
+    }
+
+    /**
+     * Run one step-up [step] against [challenge] and reconcile the
+     * cache with its outcome: swap in the returned challenge, or drop
+     * the entry once the flow completes. On a typed failure
+     * [keepsChallenge] decides whether the challenge survives for
+     * another attempt; an untyped throw always evicts. Cooperative
+     * cancellation is exempt so the next attempt can resume.
+     */
+    private suspend fun advanceStepUp(
+        handle: String,
+        challenge: PreludeStepUpChallenge,
+        keepsChallenge: (PreludeAuthError) -> Boolean,
+        step: suspend () -> PreludeStepUpChallenge?,
+    ): Map<String, Any?>? {
+        val next = try {
+            step()
         } catch (e: CancellationException) {
-            // Cooperative interrupt — leave the challenge cached so
-            // the next attempt can resume against the same handle.
             throw e
         } catch (e: Throwable) {
-            // Catch broadly: a non-[PreludeAuthError] throw (e.g. a
-            // misconfigured store NPE) must still evict the challenge
-            // so a stale entry can't outlive the failure.
-            if (e !is PreludeAuthError.InvalidOTPCode) {
+            if (e !is PreludeAuthError || !keepsChallenge(e)) {
                 clientRegistry.evictChallenge(handle, challenge.challengeId)
             }
             throw e
+        }
+        return when {
+            next == null -> {
+                // Flow completed: post-completion refresh has already
+                // minted the scoped access token.
+                clientRegistry.evictChallenge(handle, challenge.challengeId)
+                null
+            }
+            next.status == PreludeStepUpStatus.BLOCKED -> {
+                // Terminal: a blocked challenge carries no token and
+                // is unsubmittable, so don't cache it; just drop the
+                // prior entry and surface the verdict to JS.
+                clientRegistry.evictChallenge(handle, challenge.challengeId)
+                Codec.encodeChallenge(next)
+            }
+            else -> {
+                // Insert before evicting so a concurrent reader observing
+                // under the new ID never sees an empty slot during a
+                // multi-step transition.
+                clientRegistry.cacheChallenge(handle, next)
+                if (next.challengeId != challenge.challengeId) {
+                    clientRegistry.evictChallenge(handle, challenge.challengeId)
+                }
+                Codec.encodeChallenge(next)
+            }
         }
     }
 

@@ -22,6 +22,12 @@ export {
 export { StartOTPLoginOptions } from "./types/otp";
 export { MigrateOptions } from "./types/migrate";
 export {
+  PasskeyLoginOptions,
+  PasskeyRegistrationResult,
+  PreludePasskeyCredential,
+  RegisterPasskeyOptions,
+} from "./types/passkey";
+export {
   LoginWithPasswordOptions,
   PreludePasswordCompliancy,
   PreludePasswordCompliancyCriterion,
@@ -53,7 +59,14 @@ export {
   MissingChallengeTokenError,
   NetworkError,
   NoActiveStepUpError,
+  NoLoginConfigError,
   NotFoundError,
+  PasskeyAlreadyRegisteredError,
+  PasskeyNotConfiguredError,
+  PasskeyNotSupportedError,
+  PasskeyRegistrationFailedError,
+  PasskeyStepUnavailableError,
+  PasswordNotSetError,
   PreludeAuthError,
   RateLimitedError,
   RefreshFailedError,

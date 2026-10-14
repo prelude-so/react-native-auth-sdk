@@ -26,6 +26,7 @@ export interface UseSignInValue {
   migrate: AuthActions["migrate"];
   loginWithOAuth: AuthActions["loginWithOAuth"];
   checkOAuthEmailOtp: AuthActions["checkOAuthEmailOtp"];
+  loginWithPasskey: AuthActions["loginWithPasskey"];
 }
 
 const SIGN_IN_ACTIONS: ReadonlySet<AsyncAuthAction> = new Set([
@@ -36,10 +37,11 @@ const SIGN_IN_ACTIONS: ReadonlySet<AsyncAuthAction> = new Set([
   "migrate",
   "loginWithOAuth",
   "checkOAuthEmailOtp",
+  "loginWithPasskey",
 ]);
 const selectSignInPending = makeScopedPendingSelector(SIGN_IN_ACTIONS);
 
-/** Sign-in flows: OTP (start → verify) and password. */
+/** Sign-in flows: OTP (start → verify), password, social, and passkey. */
 export function useSignIn(): UseSignInValue {
   const { store, actions } = useAuthContext("useSignIn");
   return {
@@ -55,5 +57,6 @@ export function useSignIn(): UseSignInValue {
     migrate: actions.migrate,
     loginWithOAuth: actions.loginWithOAuth,
     checkOAuthEmailOtp: actions.checkOAuthEmailOtp,
+    loginWithPasskey: actions.loginWithPasskey,
   };
 }

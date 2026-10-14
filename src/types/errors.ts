@@ -84,6 +84,12 @@ export const PasswordNotSetError = subclass(
   "password_not_set",
   "PasswordNotSetError",
 );
+// The app has no login configuration accepting this identifier's
+// channel. Create one via the Auth Management API.
+export const NoLoginConfigError = subclass(
+  "no_login_config",
+  "NoLoginConfigError",
+);
 export const InsufficientScopeError = subclass(
   "insufficient_scope",
   "InsufficientScopeError",
@@ -120,11 +126,25 @@ export const PasskeyRegistrationFailedError = subclass(
   "PasskeyRegistrationFailedError",
 );
 
+// The account already holds a passkey on this authenticator. Reported
+// by Android; iOS surfaces a generic registration failure instead.
+export const PasskeyAlreadyRegisteredError = subclass(
+  "passkey_already_registered",
+  "PasskeyAlreadyRegisteredError",
+);
+
 // verify_passkey step cannot be driven — no credentials, assertion
 // failed, or no PasskeyConfig. Fall back to a different step.
 export const PasskeyStepUnavailableError = subclass(
   "passkey_step_unavailable",
   "PasskeyStepUnavailableError",
+);
+
+// The device cannot run a passkey ceremony (iOS < 16, or an Android
+// build without platform WebAuthn support).
+export const PasskeyNotSupportedError = subclass(
+  "passkey_not_supported",
+  "PasskeyNotSupportedError",
 );
 
 /**
@@ -162,13 +182,16 @@ const REGISTRY: Record<string, new (m: string) => PreludeAuthError> = {
   invalid_configuration: InvalidConfigurationError,
   invalid_password: InvalidPasswordError,
   password_not_set: PasswordNotSetError,
+  no_login_config: NoLoginConfigError,
   insufficient_scope: InsufficientScopeError,
   crypto_failure: CryptoFailureError,
   network: NetworkError,
   saml_login_required: SAMLLoginRequiredError,
   passkey_not_configured: PasskeyNotConfiguredError,
   passkey_registration_failed: PasskeyRegistrationFailedError,
+  passkey_already_registered: PasskeyAlreadyRegisteredError,
   passkey_step_unavailable: PasskeyStepUnavailableError,
+  passkey_not_supported: PasskeyNotSupportedError,
 };
 
 /**

@@ -22,6 +22,13 @@ import {
   TokenReusedError,
   UnauthorizedError,
   fromNativeError,
+  NoLoginConfigError,
+  PasskeyAlreadyRegisteredError,
+  PasskeyNotConfiguredError,
+  PasskeyNotSupportedError,
+  PasskeyRegistrationFailedError,
+  PasskeyStepUnavailableError,
+  PasswordNotSetError,
 } from "../types/errors";
 
 describe("fromNativeError", () => {
@@ -43,9 +50,16 @@ describe("fromNativeError", () => {
     ["cancelled", CancelledError],
     ["invalid_configuration", InvalidConfigurationError],
     ["invalid_password", InvalidPasswordError],
+    ["no_login_config", NoLoginConfigError],
     ["insufficient_scope", InsufficientScopeError],
     ["crypto_failure", CryptoFailureError],
     ["network", NetworkError],
+    ["password_not_set", PasswordNotSetError],
+    ["passkey_not_configured", PasskeyNotConfiguredError],
+    ["passkey_registration_failed", PasskeyRegistrationFailedError],
+    ["passkey_already_registered", PasskeyAlreadyRegisteredError],
+    ["passkey_step_unavailable", PasskeyStepUnavailableError],
+    ["passkey_not_supported", PasskeyNotSupportedError],
   ];
 
   it.each(cases)("decodes `%s` into the matching subclass", (code, Cls) => {

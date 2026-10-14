@@ -14,6 +14,25 @@ const mockNative = {
   // null return; multi-step / non-null cases are mocked per-test.
   submitStepUpOTP: jest.fn().mockResolvedValue(null),
   getActiveStepUp: jest.fn().mockResolvedValue(null),
+  continueStepUpWithPasskey: jest.fn().mockResolvedValue(null),
+  loginWithPasskey: jest.fn().mockResolvedValue({
+    accessToken: "tok",
+    profile: { extras: {} },
+  }),
+  registerPasskey: jest.fn().mockResolvedValue({
+    credential: {
+      credentialID: "cred_1",
+      nickname: null,
+      transports: ["internal", "hybrid"],
+      backupState: false,
+      createdAt: 1_700_000_000,
+      lastUsedAt: 1_700_000_000,
+    },
+    alreadyRegistered: true,
+  }),
+  listPasskeys: jest.fn().mockResolvedValue([]),
+  renamePasskey: jest.fn().mockResolvedValue(undefined),
+  deletePasskey: jest.fn().mockResolvedValue(undefined),
   migrate: jest.fn().mockResolvedValue({
     accessToken: "tok",
     profile: { extras: {} },
@@ -289,5 +308,99 @@ describe("PreludeAuthClient.migrate", () => {
       { token: "legacy_xyz" },
     );
     expect(user.accessToken).toBe("tok");
+  });
+});
+
+describe("PreludeAuthClient passkey surface", () => {
+  const challenge = {
+    status: "continue" as const,
+    challengeID: "c_pk",
+    currentStep: "verify_passkey",
+    requestedScope: "prld:passkey:write",
+  };
+
+  it("loginWithPasskey defaults autofill to false", async () => {
+    const c = new PreludeAuthClient();
+    const user = await c.loginWithPasskey();
+    expect(user.accessToken).toBe("tok");
+    expect(mockNative.loginWithPasskey).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      { autofill: false },
+    );
+  });
+
+  it("registerPasskey nulls absent optionals and decodes unix-second timestamps", async () => {
+    const c = new PreludeAuthClient();
+    const result = await c.registerPasskey({ username: "a@b.co" });
+    expect(mockNative.registerPasskey).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      { username: "a@b.co", displayName: null, nickname: null },
+    );
+    expect(result.alreadyRegistered).toBe(true);
+    expect(result.credential.credentialID).toBe("cred_1");
+    expect(result.credential.nickname).toBeNull();
+    expect(result.credential.transports).toEqual(["internal", "hybrid"]);
+    expect(result.credential.createdAt.getTime()).toBe(1_700_000_000_000);
+  });
+
+  it("listPasskeys decodes each credential", async () => {
+    mockNative.listPasskeys.mockResolvedValueOnce([
+      {
+        credentialID: "cred_2",
+        nickname: "Pixel",
+        transports: [],
+        backupState: true,
+        createdAt: 1,
+        lastUsedAt: 2,
+      },
+    ]);
+    const c = new PreludeAuthClient();
+    const [cred] = await c.listPasskeys();
+    expect(cred.nickname).toBe("Pixel");
+    expect(cred.lastUsedAt.getTime()).toBe(2000);
+  });
+
+  it("renamePasskey / deletePasskey forward the credential id", async () => {
+    const c = new PreludeAuthClient();
+    await c.renamePasskey("cred_1", "Work");
+    await c.deletePasskey("cred_1");
+    expect(mockNative.renamePasskey).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      "cred_1",
+      "Work",
+    );
+    expect(mockNative.deletePasskey).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      "cred_1",
+    );
+  });
+
+  it("continueStepUpWithPasskey only forwards the challengeID and decodes the next step", async () => {
+    const c = new PreludeAuthClient();
+    expect(await c.continueStepUpWithPasskey(challenge)).toBeNull();
+    expect(mockNative.continueStepUpWithPasskey).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      "c_pk",
+    );
+
+    mockNative.continueStepUpWithPasskey.mockResolvedValueOnce({
+      ...challenge,
+      challengeID: "c_next",
+      currentStep: "verify_email",
+    });
+    const next = await c.continueStepUpWithPasskey(challenge);
+    expect(next?.challengeID).toBe("c_next");
+  });
+
+  it("passkey methods reject after dispose", async () => {
+    const c = new PreludeAuthClient();
+    await c.dispose();
+    await expect(c.loginWithPasskey()).rejects.toBeInstanceOf(DisposedError);
+    expect(mockNative.loginWithPasskey).not.toHaveBeenCalled();
   });
 });

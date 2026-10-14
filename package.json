@@ -1,7 +1,7 @@
 {
   "name": "@prelude.so/react-native-auth-sdk",
-  "version": "0.6.0",
-  "description": "Prelude Auth SDK for React Native \u2014 OTP login, password login, refresh, step-up, and signed sessions on iOS and Android.",
+  "version": "0.7.0",
+  "description": "Prelude Auth SDK for React Native \u2014 OTP, password, social, and passkey login, refresh, step-up, and signed sessions on iOS and Android.",
   "main": "build/index.js",
   "types": "build/index.d.ts",
   "exports": {
@@ -87,10 +87,11 @@
     "react-native": ">=0.74.0"
   },
   "so_prelude": {
-    "apple_auth_sdk_tag": "0.6.0",
-    "android_auth_sdk_version": "0.6.0",
+    "apple_auth_sdk_tag": "0.7.0",
+    "android_auth_sdk_version": "0.7.1",
     "android_signals_sdk_version": "0.5.2",
-    "android_browser_version": "1.8.0"
+    "android_browser_version": "1.8.0",
+    "android_credentials_version": "1.5.0"
   },
   "jest": {
     "preset": "expo-module-scripts"
