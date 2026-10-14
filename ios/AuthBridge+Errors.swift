@@ -68,7 +68,6 @@ private func codeAndMessage(_ error: PreludeAuthError) -> (String, String) {
     case .tokenReused(let m): return ("token_reused", m)
     case .invalidOTPCode(let m): return ("invalid_otp_code", m)
     case .refreshFailed(let m): return ("refresh_failed", m)
-    case .sessionLocked(let m): return ("session_locked", m)
     case .timeout: return ("timeout", "Request timed out")
     case .cancelled: return ("cancelled", "Request cancelled")
     case .invalidConfiguration(let m): return ("invalid_configuration", m)
@@ -84,13 +83,12 @@ private func codeAndMessage(_ error: PreludeAuthError) -> (String, String) {
     case .passkeyRegistrationFailed(let m): return ("passkey_registration_failed", m)
     case .passkeyStepUnavailable(let m): return ("passkey_step_unavailable", m)
     case .passkeyNotSupported(let m): return ("passkey_not_supported", m)
-    // App-lock cases are not reachable from the bridge yet; they map to
-    // codes so the switch stays exhaustive as the native SDK grows.
-    case .lockUnavailable(let m): return ("lock_unavailable", m)
-    case .invalidPasscode(let m): return ("invalid_passcode", m)
-    case .lockedOut(let m): return ("locked_out", m)
     case .network(let underlying): return ("network", underlying.localizedDescription)
     case .generic(let code, let message): return (code, message)
+    // Cases the vendored PreludeAuth may carry beyond the pinned
+    // `apple_auth_sdk_tag` (the app lock, for one). Listing them
+    // would not compile against the tag customers receive.
+    default: return ("generic", String(describing: error))
     }
 }
 // swiftlint:enable cyclomatic_complexity
