@@ -1,6 +1,7 @@
 import { createContext, useContext, useSyncExternalStore } from "react";
 
 import { PreludeAuthClient } from "../client";
+import { IdleLock } from "../idleLock";
 
 import { AuthActions } from "./actionTypes";
 import { AuthState, AuthStore } from "./store";
@@ -9,6 +10,8 @@ export interface AuthContextValue {
   store: AuthStore;
   actions: AuthActions;
   client: PreludeAuthClient;
+  /** Set when the provider was given `idleLock` options. */
+  idleLock: IdleLock | null;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

@@ -1,9 +1,11 @@
 import { newHandle } from "./handle";
+import { IdleLock } from "./idleLock";
 import native from "./native";
 import { validatePassword } from "./passwordValidate";
 import { ConfigJson } from "./types/config";
 import { Endpoint } from "./types/endpoint";
 import { DisposedError, fromNativeError } from "./types/errors";
+import { IdleLockOptions } from "./types/idleLock";
 import { migrateOptionsToJson, MigrateOptions } from "./types/migrate";
 import {
   FinalizeOAuthLoginResult,
@@ -100,6 +102,7 @@ export class PreludeAuthClient {
   private readonly handle = newHandle();
   private readonly config: ConfigJson;
   private disposed = false;
+  private lock: IdleLock | null = null;
 
   constructor(options: PreludeAuthClientOptions = {}) {
     // Empty-string overrides collapse to `null` so a misconfigured
@@ -132,6 +135,7 @@ export class PreludeAuthClient {
     // here on purpose — `invoke` would now refuse the call.
     this.disposed = true;
     try {
+      await this.lock?.stop();
       await native.dispose(this.handle);
     } catch (e) {
       throw fromNativeError(e);
@@ -606,6 +610,20 @@ export class PreludeAuthClient {
       native.getAccessTokenExpiresAt(this.handle, this.config),
     );
     return unix == null ? null : new Date(unix * 1000);
+  }
+
+  // ---------- Idle lock ----------
+
+  /**
+   * Lock the session after `thresholdSeconds` in the background.
+   * One lock per client: the first call creates it with `options`,
+   * later calls return the same instance. `await lock.start()` to
+   * engage it. Clients that never call this see no change.
+   */
+  idleLock(options: IdleLockOptions): IdleLock {
+    if (this.disposed) throw new DisposedError();
+    this.lock ??= new IdleLock(this.handle, this.config, options);
+    return this.lock;
   }
 
   // ---------- Internals ----------

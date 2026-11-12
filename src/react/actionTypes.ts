@@ -113,6 +113,30 @@ export interface AuthActions {
   continueStepUpWithPasskey: () => Promise<StepUpChallenge | null | undefined>;
   cancelStepUp: () => void;
   clearError: () => void;
+
+  // Idle lock. Each resolves with `true` on success and `undefined`
+  // on failure; every failure populates `state.error`. Without
+  // `idleLock` options on the provider they fail with
+  // `LockUnavailableError`, as do the enrollment actions while
+  // locked: changing the credential needs an unlocked session.
+  /**
+   * Unlock with the passcode. On success the session is read back
+   * from the native cache (no network) and the stage returns to
+   * `signedIn`. `LockedOutError` signs the user out first, then is
+   * recorded in `state.error`.
+   */
+  unlock: (passcode: string) => Promise<boolean | undefined>;
+  /** Unlock with the biometric shortcut. Offer the passcode when this fails. */
+  unlockWithBiometrics: () => Promise<boolean | undefined>;
+  /** Lock now. Does nothing when signed out or when no passcode is set. */
+  lock: () => Promise<boolean | undefined>;
+  /** Set or replace the passcode (4+ characters). Drops the biometric shortcut. */
+  setPasscode: (passcode: string) => Promise<boolean | undefined>;
+  /** Arm biometrics as a shortcut past the passcode. Needs a passcode first. */
+  enableBiometrics: () => Promise<boolean | undefined>;
+  disableBiometrics: () => Promise<boolean | undefined>;
+  /** Forget the passcode and the shortcut. `signOut` does this on its own. */
+  disableIdleLock: () => Promise<boolean | undefined>;
 }
 
 /** Provider-internal wrapper that runs the restore probe under the session gate. */
@@ -123,4 +147,10 @@ export type GatedRestore = (
 export interface AuthRuntime {
   actions: AuthActions;
   restore: GatedRestore;
+  /**
+   * Reconcile `stage` with the lock: a seal moves a live session to
+   * `locked` and drops `user`; a lifted seal reads the session back.
+   * The provider subscribes it to the lock.
+   */
+  syncLock: () => void;
 }

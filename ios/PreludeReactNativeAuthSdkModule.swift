@@ -18,6 +18,16 @@ public class PreludeReactNativeAuthSdkModule: Module {
     public func definition() -> ModuleDefinition {
         Name("PreludeReactNativeAuthSdk")
 
+        Events("onIdleLockChange")
+
+        OnCreate {
+            self.bridge.onIdleLockChange = { [weak self] handle, state in
+                var body = state
+                body["handle"] = handle
+                self?.sendEvent("onIdleLockChange", body)
+            }
+        }
+
         AsyncFunction("dispose") { (handle: String) in
             // Funnel through `wrap` for parity with every other
             // method, even though the current bridge path is
@@ -89,6 +99,42 @@ public class PreludeReactNativeAuthSdkModule: Module {
             try await self.wrap { try await self.bridge.revokeSessions(handle: h, configRaw: c, target: t) }
         }
 
+        // Idle lock -------------------------------------------------
+        // Every call resolves with the lock state it left behind.
+        AsyncFunction("idleLockStart") { (h: String, c: [String: Any], o: [String: Any]) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockStart(handle: h, configRaw: c, options: o) }
+        }
+        AsyncFunction("idleLockStop") { (h: String) in
+            try await self.wrap { self.bridge.idleLockStop(handle: h) }
+        }
+        AsyncFunction("idleLockState") { (h: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockState(handle: h) }
+        }
+        AsyncFunction("idleLockSetPasscode") { (h: String, passcode: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockSetPasscode(handle: h, passcode: passcode) }
+        }
+        AsyncFunction("idleLockEnableBiometrics") { (h: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockEnableBiometrics(handle: h) }
+        }
+        AsyncFunction("idleLockDisableBiometrics") { (h: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockDisableBiometrics(handle: h) }
+        }
+        AsyncFunction("idleLockDisable") { (h: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockDisable(handle: h) }
+        }
+        AsyncFunction("idleLockLock") { (h: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockLock(handle: h) }
+        }
+        AsyncFunction("idleLockUnlock") { (h: String, passcode: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockUnlock(handle: h, passcode: passcode) }
+        }
+        AsyncFunction("idleLockUnlockWithBiometrics") { (h: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockUnlockWithBiometrics(handle: h) }
+        }
+        AsyncFunction("idleLockClear") { (h: String) -> [String: Any] in
+            try await self.wrap { try await self.bridge.idleLockClear(handle: h) }
+        }
+
         // Step-up ---------------------------------------------------
         // `metadata` arrives as `Any` so a JS `null` → NSNull is
         // accepted alongside an object-shaped payload; the bridge
@@ -148,6 +194,7 @@ public class PreludeReactNativeAuthSdkModule: Module {
             // Engine teardown: drop everything so the next load
             // doesn't observe a stale challenge cache or leaked
             // native client.
+            self.bridge.onIdleLockChange = nil
             self.bridge.clearAll()
         }
     }

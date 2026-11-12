@@ -18,12 +18,15 @@ export function SignedIn({ children }: { children: ReactNode }): ReactNode {
 /**
  * Renders children while no session exists: signed out, or mid
  * sign-in (awaiting a first-login OTP). A re-auth OTP flow stays on
- * the `SignedIn` side — the session is still live. Check
- * `useAuth().stage === "awaitingOtp"` for finer control.
+ * the `SignedIn` side — the session is still live. A locked session
+ * is neither: `user` is null while locked, but `Locked` owns that
+ * state. Check `useAuth().stage === "awaitingOtp"` for finer control.
  */
 export function SignedOut({ children }: { children: ReactNode }): ReactNode {
   const { stage, user } = useAuth();
-  return user === null && stage !== "initializing" ? children : null;
+  return user === null && stage !== "initializing" && stage !== "locked"
+    ? children
+    : null;
 }
 
 /**
@@ -34,4 +37,13 @@ export function SignedOut({ children }: { children: ReactNode }): ReactNode {
  */
 export function AuthLoading({ children }: { children: ReactNode }): ReactNode {
   return useAuth().stage === "initializing" ? children : null;
+}
+
+/**
+ * Renders children while the idle lock is engaged: a session exists
+ * but is sealed until the user enters the passcode or passes the
+ * biometric check. Pair with `useIdleLock()`.
+ */
+export function Locked({ children }: { children: ReactNode }): ReactNode {
+  return useAuth().stage === "locked" ? children : null;
 }

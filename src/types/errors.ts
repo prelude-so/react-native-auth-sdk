@@ -147,6 +147,28 @@ export const PasskeyNotSupportedError = subclass(
   "PasskeyNotSupportedError",
 );
 
+// The session is sealed by the idle lock. Unlock it before making
+// protected calls.
+export const SessionLockedError = subclass(
+  "session_locked",
+  "SessionLockedError",
+);
+
+// The lock could not be armed or the unlock was not confirmed.
+export const LockUnavailableError = subclass(
+  "lock_unavailable",
+  "LockUnavailableError",
+);
+
+// Wrong app-lock passcode; the message says how many attempts remain.
+export const InvalidPasscodeError = subclass(
+  "invalid_passcode",
+  "InvalidPasscodeError",
+);
+
+// App-lock attempts are spent. Sign the user out.
+export const LockedOutError = subclass("locked_out", "LockedOutError");
+
 /**
  * Thrown when a method is called on a disposed `PreludeAuthClient`.
  * Programmer error — distinct from API errors. Subclasses
@@ -192,6 +214,10 @@ const REGISTRY: Record<string, new (m: string) => PreludeAuthError> = {
   passkey_already_registered: PasskeyAlreadyRegisteredError,
   passkey_step_unavailable: PasskeyStepUnavailableError,
   passkey_not_supported: PasskeyNotSupportedError,
+  session_locked: SessionLockedError,
+  lock_unavailable: LockUnavailableError,
+  invalid_passcode: InvalidPasscodeError,
+  locked_out: LockedOutError,
 };
 
 /**

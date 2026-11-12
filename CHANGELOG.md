@@ -4,6 +4,35 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-11-12
+
+### Added
+- Idle lock. `client.idleLock({ thresholdSeconds })` returns an
+  `IdleLock` that locks the session after that long in the
+  background; the user unlocks it offline with an app passcode
+  (`unlock(passcode)`) or biometrics (`unlockWithBiometrics()`).
+  Locking seals the native client, so every protected call throws
+  `SessionLockedError` until unlock. `setPasscode`,
+  `enableBiometrics` / `disableBiometrics`, `lock`, `disable` and
+  `clear` manage it; `getState()` / `subscribe()` mirror the native
+  state, including a seal the native side applies on its own. Wrong
+  passcodes are capped at `maxAttempts` (default 5). By default the
+  lock also engages on `start()`, so relaunching does not skip it.
+- React layer: `idleLock` options on `PreludeAuthProvider`, the
+  `useIdleLock()` hook, the `<Locked>` gate and the `"locked"`
+  stage. While locked, `user` is `null`; on unlock the session is read
+  back from the native cache without a network call. Every path that
+  ends the session (`signOut`, a rejected refresh, a launch with no
+  session) forgets the passcode. `LockedOutError` signs the user out.
+- `SessionLockedError`, `LockUnavailableError`, `InvalidPasscodeError`
+  and `LockedOutError`.
+
+### Changed
+- Pins the native SDKs to Apple Auth SDK 0.8.0 and Android Auth SDK
+  0.8.0. Android gains `androidx.biometric` as a runtime dependency.
+- `AuthStage` gains `"locked"`. An exhaustive `switch` over the stage
+  needs a new arm.
+
 ## [0.7.1] - 2026-10-14
 
 ### Fixed
