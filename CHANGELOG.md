@@ -4,6 +4,14 @@ Notable changes to the Prelude React Native Auth SDK (`@prelude.so/react-native-
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.1] - 2026-11-12
+
+### Fixed
+- iOS Simulator: setting the idle lock passcode always failed with
+  `LockUnavailableError` ("This device cannot bind an application
+  password"). Pins the Apple Auth SDK to 0.8.1, which fixes this.
+  Nothing changes on a device or on Android.
+
 ## [0.8.0] - 2026-11-12
 
 ### Added
