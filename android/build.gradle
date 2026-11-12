@@ -8,10 +8,11 @@ apply plugin: 'com.android.library'
 def packageJson = new JsonSlurper().parse(file('../package.json'))
 def authSdkVersion = packageJson.so_prelude.android_auth_sdk_version
 def signalsSdkVersion = packageJson.so_prelude.android_signals_sdk_version
-if (!authSdkVersion || !signalsSdkVersion) {
+def biometricVersion = packageJson.so_prelude.android_biometric_version
+if (!authSdkVersion || !signalsSdkVersion || !biometricVersion) {
   throw new GradleException(
-    "package.json is missing so_prelude.android_auth_sdk_version " +
-    "or so_prelude.android_signals_sdk_version"
+    "package.json is missing so_prelude.android_auth_sdk_version, " +
+    "so_prelude.android_signals_sdk_version or so_prelude.android_biometric_version"
   )
 }
 
@@ -64,6 +65,9 @@ dependencies {
   // Signals SDK — wrapped by [PreludeSignalsAdapter]; pin moves with
   // package.json's `android_signals_sdk_version`.
   implementation("so.prelude.android:sdk:${signalsSdkVersion}")
+  // The auth SDK declares BiometricPrompt compile-only; the idle
+  // lock's biometric unlock needs it at runtime.
+  implementation("androidx.biometric:biometric:${biometricVersion}")
 
   testImplementation 'junit:junit:4.13.2'
   testImplementation 'org.mockito:mockito-core:5.11.0'

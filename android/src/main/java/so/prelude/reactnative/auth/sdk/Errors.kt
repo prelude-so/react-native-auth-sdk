@@ -100,6 +100,14 @@ private fun mapAuthError(error: PreludeAuthError): CodedException =
             CodedException("passkey_step_unavailable", error.message.orEmpty(), error)
         is PreludeAuthError.PasskeyNotSupported ->
             CodedException("passkey_not_supported", error.message.orEmpty(), error)
+        is PreludeAuthError.SessionLocked ->
+            CodedException("session_locked", error.message.orEmpty(), error)
+        is PreludeAuthError.LockUnavailable ->
+            CodedException("lock_unavailable", error.message.orEmpty(), error)
+        is PreludeAuthError.InvalidPasscode ->
+            CodedException("invalid_passcode", error.message.orEmpty(), error)
+        is PreludeAuthError.LockedOut ->
+            CodedException("locked_out", error.message.orEmpty(), error)
         is PreludeAuthError.Network ->
             CodedException("network", causeMessage(error, "Network error"), error)
         is PreludeAuthError.CryptoFailure ->

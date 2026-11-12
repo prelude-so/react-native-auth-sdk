@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { PreludeAuthClient, PreludeAuthClientOptions } from "../client";
+import { IdleLockOptions } from "../types/idleLock";
 import { createAuthActions } from "./actions";
 import { AuthContext } from "./context";
 import { RestoreOutcome } from "./restore";
@@ -18,6 +19,14 @@ export interface PreludeAuthProviderProps {
   options?: PreludeAuthClientOptions;
   /** Inject a client (tests, multi-tenant apps). The provider will not dispose it. */
   client?: PreludeAuthClient;
+  /**
+   * Lock the session after `thresholdSeconds` in the background. The
+   * lock starts before the session restore, so with `lockOnStart`
+   * (the default) a relaunch lands on `stage === "locked"`. Drive the
+   * lock screen with `useIdleLock()`. Locked on first mount like the
+   * other props.
+   */
+  idleLock?: IdleLockOptions;
   /**
    * Fires once after the silent session-restore probe completes on
    * mount. Useful for hiding a splash, kicking off route decisions,
@@ -31,6 +40,7 @@ export interface PreludeAuthProviderProps {
 export function PreludeAuthProvider({
   options,
   client: externalClient,
+  idleLock: idleLockOptions,
   onRestored,
   children,
 }: PreludeAuthProviderProps) {
@@ -51,9 +61,14 @@ export function PreludeAuthProvider({
   );
   const ownsClient = useRef(!externalClient);
   const [store] = useState(createAuthStore);
-  const { actions, restore } = useMemo(
-    () => createAuthActions(client, store),
-    [client, store],
+  // Like `client`, the lock is pure JS until `start()`: the discarded
+  // StrictMode instance never reaches the native side.
+  const [idleLock] = useState(() =>
+    idleLockOptions ? client.idleLock(idleLockOptions) : null,
+  );
+  const { actions, restore, syncLock } = useMemo(
+    () => createAuthActions(client, store, idleLock),
+    [client, store, idleLock],
   );
 
   // Ref-store the callback so a parent re-render passing a fresh
@@ -62,13 +77,26 @@ export function PreludeAuthProvider({
   onRestoredRef.current = onRestored;
   useEffect(() => {
     let cancelled = false;
-    void restore(() => cancelled).then((outcome) => {
-      if (outcome) onRestoredRef.current?.(outcome);
+    // The lock starts first: with `lockOnStart` the client is sealed
+    // before the probe's refresh, so the probe lands on `locked`
+    // rather than reading the session and being locked a moment
+    // later. A failed start still runs the probe; the error surfaces
+    // on the first lock action.
+    const unsubscribe = idleLock?.subscribe(syncLock);
+    const started = idleLock ? idleLock.start().catch(() => {}) : Promise.resolve();
+    void started.then(() => {
+      if (cancelled) return;
+      return restore(() => cancelled).then((outcome) => {
+        if (outcome) onRestoredRef.current?.(outcome);
+        // A seal that raced the probe is reconciled now.
+        if (!cancelled) syncLock();
+      });
     });
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
-  }, [restore]);
+  }, [idleLock, restore, syncLock]);
 
   // Defer dispose via `pendingDispose` so StrictMode's unmount →
   // remount cycle in dev can cancel it: the next effect run clears
@@ -90,8 +118,8 @@ export function PreludeAuthProvider({
   }, [client]);
 
   const value = useMemo(
-    () => ({ store, actions, client }),
-    [store, actions, client],
+    () => ({ store, actions, client, idleLock }),
+    [store, actions, client, idleLock],
   );
   return createElement(AuthContext.Provider, { value }, children);
 }

@@ -1,4 +1,5 @@
 import type { PreludeAuthClient } from "../../client";
+import { SessionLockedError } from "../../types/errors";
 import { StepUpChallenge } from "../../types/stepUp";
 import { PreludeUser } from "../../types/user";
 import { restoreSession } from "../restore";
@@ -54,6 +55,18 @@ describe("restoreSession", () => {
     expect(s.stage).toBe("signedIn");
     expect(s.user).toBe(user);
     expect(s.stepUp).toBeNull();
+  });
+
+  test("refresh throws SessionLocked → locked, no user", async () => {
+    const store = createAuthStore();
+    const client = clientWith({
+      refresh: mockFn().mockRejectedValue(new SessionLockedError("Unlock the session")),
+    });
+
+    const outcome = await restoreSession(client, store);
+    expect(outcome).toEqual({ stage: "locked" });
+    expect(store.getSnapshot().stage).toBe("locked");
+    expect(store.getSnapshot().user).toBeNull();
   });
 
   test("refresh throws → signedOut, no user", async () => {

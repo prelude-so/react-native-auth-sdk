@@ -1,6 +1,7 @@
-import { requireNativeModule } from "expo-modules-core";
+import { EventSubscription, requireNativeModule } from "expo-modules-core";
 
 import { ConfigJson } from "./types/config";
+import { IdleLockOptionsJson, IdleLockStateJson } from "./types/idleLock";
 import { MigrateOptionsJson } from "./types/migrate";
 import {
   FinalizeOAuthLoginResultJson,
@@ -27,6 +28,9 @@ import {
 import { StepUpChallengeJson } from "./types/stepUp";
 import { PreludeUserJson } from "./types/user";
 
+/** Fired when a lock changes natively (a seal on foreground, a withdrawn lock). */
+export type IdleLockChangeEvent = IdleLockStateJson & { handle: string };
+
 /**
  * Native module proxy. Every async method takes a `handle`
  * (per-instance UUID) and a `config` snapshot so the native
@@ -34,6 +38,12 @@ import { PreludeUserJson } from "./types/user";
  * use.
  */
 export interface PreludeAuthNativeModule {
+  // Events
+  addListener(
+    name: "onIdleLockChange",
+    listener: (event: IdleLockChangeEvent) => void,
+  ): EventSubscription;
+
   // Lifecycle
   dispose(handle: string): Promise<void>;
 
@@ -175,6 +185,27 @@ export interface PreludeAuthNativeModule {
     config: ConfigJson,
     credentialID: string,
   ): Promise<void>;
+
+  // Idle lock. One lock per handle; every call resolves with the
+  // state it left behind.
+  idleLockStart(
+    handle: string,
+    config: ConfigJson,
+    options: IdleLockOptionsJson,
+  ): Promise<IdleLockStateJson>;
+  idleLockStop(handle: string): Promise<void>;
+  idleLockState(handle: string): Promise<IdleLockStateJson>;
+  idleLockSetPasscode(
+    handle: string,
+    passcode: string,
+  ): Promise<IdleLockStateJson>;
+  idleLockEnableBiometrics(handle: string): Promise<IdleLockStateJson>;
+  idleLockDisableBiometrics(handle: string): Promise<IdleLockStateJson>;
+  idleLockDisable(handle: string): Promise<IdleLockStateJson>;
+  idleLockLock(handle: string): Promise<IdleLockStateJson>;
+  idleLockUnlock(handle: string, passcode: string): Promise<IdleLockStateJson>;
+  idleLockUnlockWithBiometrics(handle: string): Promise<IdleLockStateJson>;
+  idleLockClear(handle: string): Promise<IdleLockStateJson>;
 
   // Cached readers
   getProfile(

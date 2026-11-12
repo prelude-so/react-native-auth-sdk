@@ -18,6 +18,7 @@ package so.prelude.reactnative.auth.sdk
 
 import android.app.Activity
 import android.content.Context
+import androidx.fragment.app.FragmentActivity
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.functions.Coroutine
 import expo.modules.kotlin.modules.Module
@@ -57,11 +58,18 @@ import so.prelude.android.auth.social.loginWithOAuth
 import so.prelude.android.auth.submitStepUpOTP
 
 class PreludeReactNativeAuthSdkModule : Module() {
-    private val clientRegistry = ClientRegistry()
+    private val clientRegistry =
+        ClientRegistry { handle, state ->
+            sendEvent("onIdleLockChange", state + ("handle" to handle))
+        }
+    private val idleLocks
+        get() = clientRegistry.idleLocks
 
     override fun definition() =
         ModuleDefinition {
             Name("PreludeReactNativeAuthSdk")
+
+            Events("onIdleLockChange")
 
             // Drop the native client and step-up cache for this handle
             // when the JS instance is disposed. Synchronous: nothing
@@ -153,6 +161,51 @@ class PreludeReactNativeAuthSdkModule : Module() {
                 withClient(handle, config) { client ->
                     handleCheckOAuthEmailOTP(handle, client, id, code)
                 }
+            }
+
+            // Idle lock ---------------------------------------------
+            // Every call resolves with the lock state it left behind.
+            AsyncFunction("idleLockStart") Coroutine {
+                handle: String, config: Map<String, Any?>, options: Map<String, Any?> ->
+                withClient(handle, config) { idleLocks.start(handle, it, options) }
+            }
+            AsyncFunction("idleLockStop") { handle: String ->
+                idleLocks.stop(handle)
+            }
+            AsyncFunction("idleLockState") Coroutine { handle: String ->
+                withLock(handle) { it.snapshot() }
+            }
+            AsyncFunction("idleLockSetPasscode") Coroutine { handle: String, passcode: String ->
+                withLock(handle) { it.lock.setPasscode(passcode) }
+            }
+            AsyncFunction("idleLockEnableBiometrics") Coroutine { handle: String ->
+                withLock(handle) { it.lock.enableBiometrics() }
+            }
+            AsyncFunction("idleLockDisableBiometrics") Coroutine { handle: String ->
+                withLock(handle) { it.lock.disableBiometrics() }
+            }
+            AsyncFunction("idleLockDisable") Coroutine { handle: String ->
+                withLock(handle) { it.lock.disable() }
+            }
+            AsyncFunction("idleLockLock") Coroutine { handle: String ->
+                withLock(handle) { it.lock.lock() }
+            }
+            AsyncFunction("idleLockUnlock") Coroutine { handle: String, passcode: String ->
+                withLock(handle) { it.lock.unlock(passcode) }
+            }
+            // BiometricPrompt needs the hosting Activity; Expo's is a
+            // FragmentActivity. Resolved inside `withLock` so a missing
+            // one reaches JS as a typed error.
+            AsyncFunction("idleLockUnlockWithBiometrics") Coroutine { handle: String ->
+                withLock(handle) {
+                    val activity =
+                        requireActivity("unlockWithBiometrics") as? FragmentActivity
+                            ?: throw PreludeAuthError.LockUnavailable("Biometrics need a FragmentActivity host")
+                    it.lock.unlockWithBiometrics(activity)
+                }
+            }
+            AsyncFunction("idleLockClear") Coroutine { handle: String ->
+                withLock(handle) { it.lock.clear() }
             }
 
             // Refresh / logout / invalidate -------------------------
@@ -288,6 +341,27 @@ class PreludeReactNativeAuthSdkModule : Module() {
                 clientRegistry.clear()
             }
         }
+
+    /**
+     * Run [block] against the lock for [handle] and resolve with the
+     * state it left behind, translating throws like [withClient].
+     * Lock work hits the Keystore, so it runs on `Dispatchers.IO`;
+     * the lock moves its own prompt to the main thread.
+     */
+    private suspend fun withLock(
+        handle: String,
+        block: suspend (IdleLockEntry) -> Any?,
+    ): Map<String, Any?> = withContext(Dispatchers.IO) {
+        try {
+            val entry = idleLocks.get(handle)
+            block(entry)
+            entry.snapshot()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            throw mapError(e)
+        }
+    }
 
     /**
      * Resolve the native client for [handle] (constructing it on first

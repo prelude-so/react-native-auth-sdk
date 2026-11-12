@@ -6,13 +6,15 @@ import { PreludeUser } from "../types/user";
 /**
  * High-level auth stage for UI routing. Sub-flows (e.g. password
  * change, MFA reauth) compose on top of these — they don't get
- * their own top-level stage.
+ * their own top-level stage. `locked` is the idle lock: a session
+ * exists but is sealed, and `user` is null until it is unlocked.
  */
 export type AuthStage =
   | "initializing"
   | "signedOut"
   | "awaitingOtp"
-  | "signedIn";
+  | "signedIn"
+  | "locked";
 
 export interface AuthState {
   stage: AuthStage;
@@ -50,7 +52,13 @@ export type AsyncAuthAction =
   | "requestStepUp"
   | "sendStepUpOtp"
   | "submitStepUpOtp"
-  | "continueStepUpWithPasskey";
+  | "continueStepUpWithPasskey"
+  | "unlock"
+  | "lock"
+  | "setPasscode"
+  | "enableBiometrics"
+  | "disableBiometrics"
+  | "disableIdleLock";
 
 export interface AuthStore {
   subscribe: (listener: () => void) => () => void;

@@ -1,4 +1,5 @@
 import { PreludeAuthClient } from "../client";
+import { SessionLockedError } from "../types/errors";
 import { StepUpChallenge } from "../types/stepUp";
 import { PreludeUser } from "../types/user";
 
@@ -7,7 +8,8 @@ import { AuthStore } from "./store";
 /** Terminal state of a silent session-restore probe. */
 export type RestoreOutcome =
   | { stage: "signedIn"; user: PreludeUser; stepUp: StepUpChallenge | null }
-  | { stage: "signedOut" };
+  | { stage: "signedOut" }
+  | { stage: "locked" };
 
 export interface RestoreOptions {
   /** Host unmounted before we settled — bail out without writing. */
@@ -24,6 +26,8 @@ export interface RestoreOptions {
  * Silent session restore. Only `refresh()` decides signed-in vs
  * signed-out — a step-up probe failure (transient native bridge
  * error, etc.) must not discard a successfully refreshed session.
+ * A sealed client (the idle lock engaged on launch) lands on
+ * `locked`; the session is read once the lock lifts.
  *
  * Returns the outcome on settle, or `null` if cancelled / staled
  * mid-flight (so the caller can fire one-shot callbacks accurately).
@@ -43,9 +47,10 @@ export async function restoreSession(
     if (dead()) return null;
     store.setState({ stage: "signedIn", user, stepUp });
     return { stage: "signedIn", user, stepUp };
-  } catch {
+  } catch (e) {
     if (dead()) return null;
-    store.setState({ stage: "signedOut" });
-    return { stage: "signedOut" };
+    const stage = e instanceof SessionLockedError ? "locked" : "signedOut";
+    store.setState({ stage });
+    return { stage };
   }
 }

@@ -1,6 +1,9 @@
 import { PreludeAuthClient } from "../client";
+import { IdleLock } from "../idleLock";
 import {
   CancelledError,
+  LockedOutError,
+  LockUnavailableError,
   NoActiveStepUpError,
   TokenReusedError,
   UnauthorizedError,
@@ -44,11 +47,109 @@ function isSessionGone(e: unknown): boolean {
 export function createAuthActions(
   client: PreludeAuthClient,
   store: AuthStore,
+  lock: IdleLock | null = null,
 ): AuthRuntime {
   const otp: Gate = { gen: 0 };
   const stepUp: Gate = { gen: 0 };
   const session: Gate = { gen: 0 };
   const { guarded, projectPending } = createGuarded(store);
+
+  const requireLock = (): IdleLock => {
+    if (!lock) {
+      throw new LockUnavailableError(
+        "Pass idleLock options to PreludeAuthProvider to use the idle lock",
+      );
+    }
+    return lock;
+  };
+
+  // Changing or removing the credential while locked would be a way
+  // past the lock, and native `disable` does not lift the seal.
+  const requireUnlocked = (lock: IdleLock): IdleLock => {
+    if (lock.getState().isLocked || store.getSnapshot().stage === "locked") {
+      throw new LockUnavailableError("Unlock the session before changing the lock");
+    }
+    return lock;
+  };
+
+  // The passcode belongs to the session that ended; the next user
+  // sets their own. Every path to `signedOut` calls this, or a stale
+  // credential could seal the next session behind a passcode its
+  // user never set. Nothing is left to guard if it fails, so the
+  // error is not surfaced.
+  const forgetLock = (): Promise<void> =>
+    lock?.disable().catch(() => {}) ?? Promise.resolve();
+
+  // The native seal already hides the profile and token; this drops
+  // the JS copy too. Bumping the gates stales any session-writing
+  // action in flight, so a login or refresh that lands after the
+  // seal cannot bring `user` back while locked.
+  const lockSession = () => {
+    otp.gen++;
+    session.gen++;
+    store.setState({
+      stage: "locked",
+      user: null,
+      pendingIdentifier: null,
+      otpSentAt: null,
+    });
+  };
+
+  // Reads the session back from the native cache: no network, so an
+  // offline unlock works. The cache ignores expiration; the next
+  // protected call refreshes if needed.
+  let unlocking: Promise<void> | null = null;
+  const unlockSession = (): Promise<void> =>
+    (unlocking ??= (async () => {
+      const captured = session.gen;
+      try {
+        const [profile, accessToken] = await Promise.all([
+          client.getProfile(),
+          client.getAccessToken(),
+        ]);
+        if (session.gen !== captured || store.getSnapshot().stage !== "locked") {
+          return;
+        }
+        if (profile && accessToken) {
+          store.setState({ stage: "signedIn", user: { accessToken, profile } });
+        } else {
+          store.setState({ stage: "signedOut", user: null });
+          await forgetLock();
+        }
+      } catch {
+        if (session.gen === captured && store.getSnapshot().stage === "locked") {
+          store.setState({ stage: "signedOut", user: null });
+          await forgetLock();
+        }
+      } finally {
+        unlocking = null;
+      }
+    })());
+
+  // While the cold-start probe runs it has authority: a sealed client
+  // makes its refresh throw `SessionLocked`, which lands on `locked`.
+  // The provider calls this again once the probe settles.
+  const syncLock = () => {
+    if (!lock) return;
+    const { stage } = store.getSnapshot();
+    if (stage === "initializing") return;
+    if (lock.getState().isLocked) {
+      if (stage !== "locked") lockSession();
+    } else if (stage === "locked") {
+      void unlockSession();
+    }
+  };
+
+  // Lock actions report success as `true`; `guarded` turns a throw
+  // into `undefined` and records the error.
+  const lockAction = (
+    name: AsyncAuthAction,
+    body: (lock: IdleLock) => Promise<void>,
+  ) =>
+    guarded(name, [], async () => {
+      await body(requireLock());
+      return true as const;
+    });
 
   // The active challenge is read from `state.stepUp` at call time, so
   // a concurrent `requestStepUp` can't redirect an in-flight step.
@@ -225,6 +326,7 @@ export function createAuthActions(
               otpSentAt: null,
               stepUp: null,
             });
+            await forgetLock();
           }
           throw e;
         }
@@ -260,6 +362,7 @@ export function createAuthActions(
         // `signedOut`, since there is no local session to preserve.
         if (store.getSnapshot().stage === "initializing") {
           store.setState({ stage: "signedOut" });
+          await forgetLock();
         }
         return;
       }
@@ -277,6 +380,7 @@ export function createAuthActions(
         stepUp: null,
         error: null,
       });
+      await forgetLock();
     },
     async changePassword(password) {
       return guarded("changePassword", [session], async () => {
@@ -328,6 +432,55 @@ export function createAuthActions(
     clearError() {
       store.setState({ error: null });
     },
+
+    async unlock(passcode) {
+      return lockAction("unlock", async (lock) => {
+        try {
+          await lock.unlock(passcode);
+        } catch (e) {
+          // Attempts are spent: the session is unreachable without a
+          // sign-in. `signOut` runs first so the error it clears on
+          // entry is not this one.
+          if (e instanceof LockedOutError) await actions.signOut();
+          throw e;
+        }
+        // The lock's own change event also triggers this; the second
+        // call is a no-op once the stage has moved.
+        await unlockSession();
+      });
+    },
+    async unlockWithBiometrics() {
+      return lockAction("unlock", async (lock) => {
+        await lock.unlockWithBiometrics();
+        await unlockSession();
+      });
+    },
+    async lock() {
+      return lockAction("lock", async (lock) => {
+        await lock.lock();
+        syncLock();
+      });
+    },
+    async setPasscode(passcode) {
+      return lockAction("setPasscode", (lock) =>
+        requireUnlocked(lock).setPasscode(passcode),
+      );
+    },
+    async enableBiometrics() {
+      return lockAction("enableBiometrics", (lock) =>
+        requireUnlocked(lock).enableBiometrics(),
+      );
+    },
+    async disableBiometrics() {
+      return lockAction("disableBiometrics", (lock) =>
+        requireUnlocked(lock).disableBiometrics(),
+      );
+    },
+    async disableIdleLock() {
+      return lockAction("disableIdleLock", (lock) =>
+        requireUnlocked(lock).disable(),
+      );
+    },
   };
 
   // The cold-start probe only has authority while `stage` is still
@@ -336,15 +489,17 @@ export function createAuthActions(
   // write is dropped. The gate capture covers the one stage-preserving
   // case: a `signOut` whose server logout failed bumps the gate but
   // leaves `initializing` in place.
-  const restore: GatedRestore = (isCancelled) => {
+  const restore: GatedRestore = async (isCancelled) => {
     const captured = session.gen;
-    return restoreSession(client, store, {
+    const outcome = await restoreSession(client, store, {
       isCancelled,
       isStale: () =>
         session.gen !== captured ||
         store.getSnapshot().stage !== "initializing",
     });
+    if (outcome?.stage === "signedOut") await forgetLock();
+    return outcome;
   };
 
-  return { actions, restore };
+  return { actions, restore, syncLock };
 }

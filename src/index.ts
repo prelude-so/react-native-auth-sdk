@@ -5,6 +5,8 @@ export {
 } from "./client";
 
 export { Endpoint } from "./types/endpoint";
+export { IdleLock } from "./idleLock";
+export { IdleLockOptions, IdleLockState } from "./types/idleLock";
 export {
   PreludeIdentifier,
   PreludeIdentifierType,
@@ -55,7 +57,10 @@ export {
   InvalidChallengeTokenError,
   InvalidConfigurationError,
   InvalidOTPCodeError,
+  InvalidPasscodeError,
   InvalidPasswordError,
+  LockedOutError,
+  LockUnavailableError,
   MissingChallengeTokenError,
   NetworkError,
   NoActiveStepUpError,
@@ -71,6 +76,7 @@ export {
   RateLimitedError,
   RefreshFailedError,
   SAMLLoginRequiredError,
+  SessionLockedError,
   TimeoutError,
   TokenReusedError,
   UnauthorizedError,

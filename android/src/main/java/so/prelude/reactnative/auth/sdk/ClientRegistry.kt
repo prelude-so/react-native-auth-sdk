@@ -2,6 +2,7 @@ package so.prelude.reactnative.auth.sdk
 
 import android.content.Context
 import android.content.pm.PackageManager
+import expo.modules.kotlin.exception.CodedException
 import so.prelude.android.auth.OAuthEmailChallenge
 import so.prelude.android.auth.OAuthLoginContext
 import so.prelude.android.auth.PreludeAuthClient
@@ -42,20 +43,31 @@ internal fun resolveSignalsSDKKey(context: Context, override: String?): String? 
 
 /**
  * Per-handle native client cache plus the per-handle in-flight
- * challenges and pending OAuth login. A single lock covers them all:
- * their lifetimes are coupled (disposing a handle should evict every
- * entry in lockstep) and the wire form sent across the bridge relies
- * on these caches to keep bearer tokens and PKCE verifiers off the
- * JS side.
+ * challenges, pending OAuth login and idle lock. A single lock covers
+ * them all: their lifetimes are coupled (disposing a handle evicts
+ * every entry in lockstep) and the wire form sent across the bridge
+ * relies on these caches to keep bearer tokens and PKCE verifiers off
+ * the JS side.
+ *
+ * A disposed handle stays disposed: JS never reuses one, so a call
+ * that lands after `dispose` must not rebuild the client (and with
+ * it a lock nobody can reach).
  */
-internal class ClientRegistry {
+internal class ClientRegistry(
+    onIdleLockChange: (handle: String, state: Map<String, Any?>) -> Unit,
+) {
     private val clients: MutableMap<String, PreludeAuthClient> = mutableMapOf()
+    private val disposed: MutableSet<String> = mutableSetOf()
     private val challenges: MutableMap<String, MutableMap<String, PreludeStepUpChallenge>> =
         mutableMapOf()
     private val oauthChallenges: MutableMap<String, MutableMap<String, OAuthEmailChallenge>> =
         mutableMapOf()
     private val oauthContexts: MutableMap<String, OAuthLoginContext> = mutableMapOf()
     private val lock = Any()
+
+    val idleLocks = IdleLockRegistry(onIdleLockChange, isLive = ::isLive)
+
+    private fun isLive(handle: String): Boolean = synchronized(lock) { handle in clients }
 
     /**
      * Lookup-or-create runs inside the same lock on purpose: a split
@@ -72,6 +84,9 @@ internal class ClientRegistry {
     ): PreludeAuthClient =
         synchronized(lock) {
             clients[handle]?.let { return@synchronized it }
+            if (handle in disposed) {
+                throw CodedException("disposed", "PreludeAuthClient has been disposed", null)
+            }
             val config = ClientConfig.decode(configRaw)
             val signalsKey = resolveSignalsSDKKey(context, config.signalsKeyOverride)
             // Adapter no-ops when `sdkKey` is null, so we always
@@ -90,23 +105,34 @@ internal class ClientRegistry {
         }
 
     /** Drop the client and any cached challenges for [handle]. */
+    /**
+     * The lock is stopped after the handle is dead, outside [lock]:
+     * [IdleLockRegistry] asks [isLive] under its own monitor, so
+     * taking both here could deadlock. Either order leaves no lock
+     * behind: a start that checks liveness before this removes the
+     * client is stopped here, one that checks after installs nothing.
+     */
     fun dispose(handle: String) {
         synchronized(lock) {
+            disposed += handle
             clients.remove(handle)
             challenges.remove(handle)
             oauthChallenges.remove(handle)
             oauthContexts.remove(handle)
         }
+        idleLocks.stop(handle)
     }
 
     /** Drop everything; called on module teardown. */
     fun clear() {
         synchronized(lock) {
+            disposed += clients.keys
             clients.clear()
             challenges.clear()
             oauthChallenges.clear()
             oauthContexts.clear()
         }
+        idleLocks.clear()
     }
 
     /**

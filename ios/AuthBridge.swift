@@ -29,6 +29,11 @@ final class AuthBridge {
     private var challenges: [String: [String: StepUpChallenge]] = [:]
     private var oauthChallenges: [String: [String: OAuthEmailChallenge]] = [:]
     private var oauthContexts: [String: OAuthLoginContext] = [:]
+    private var idleLocks: [String: IdleLockEntry] = [:]
+
+    /// Set by the Expo module, which owns `sendEvent`. Receives the
+    /// handle and the lock's new state.
+    var onIdleLockChange: ((String, [String: Any]) -> Void)?
 
     /// Single serial queue covers every map. Their lifetimes are
     /// coupled — disposing a handle evicts everything in
@@ -118,6 +123,7 @@ final class AuthBridge {
             challenges.removeValue(forKey: handle)
             oauthChallenges.removeValue(forKey: handle)
             oauthContexts.removeValue(forKey: handle)
+            idleLocks.removeValue(forKey: handle)?.stop()
         }
     }
 
@@ -131,6 +137,27 @@ final class AuthBridge {
             challenges.removeAll()
             oauthChallenges.removeAll()
             oauthContexts.removeAll()
+            idleLocks.values.forEach { $0.stop() }
+            idleLocks.removeAll()
+        }
+    }
+
+    // MARK: - Idle lock registry
+
+    func currentIdleLock(handle: String) -> IdleLockEntry? {
+        queue.sync { idleLocks[handle] }
+    }
+
+    /// Stops the lock it replaces. A write that races `dispose(handle:)`
+    /// no-ops, like the challenge caches.
+    func replaceIdleLock(handle: String, with entry: IdleLockEntry?) {
+        queue.sync {
+            idleLocks.removeValue(forKey: handle)?.stop()
+            guard let entry, clients[handle] != nil else {
+                entry?.stop()
+                return
+            }
+            idleLocks[handle] = entry
         }
     }
 
